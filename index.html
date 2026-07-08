@@ -1,0 +1,1412 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="format-detection" content="telephone=no">
+<title>Чек-ин турнира</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    background: #f2f2f7;
+    color: #1c1c1e;
+    -webkit-text-size-adjust: 100%;
+  }
+  #app {
+    max-width: 520px;
+    margin: 0 auto;
+    min-height: 100%;
+    display: flex;
+    flex-direction: column;
+    padding: 16px;
+  }
+  .topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 16px;
+  }
+  .topbar h1 { font-size: 20px; font-weight: 700; }
+  .topbar .ver { font-size: 12px; color: #8e8e93; }
+  .screen { display: none; flex-direction: column; gap: 14px; }
+  .screen.active { display: flex; }
+  .card {
+    background: #ffffff;
+    border-radius: 14px;
+    padding: 18px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+  .status {
+    border-radius: 12px;
+    padding: 12px 14px;
+    font-size: 15px;
+    font-weight: 600;
+    text-align: center;
+  }
+  .status.wait { background: #e5e5ea; color: #3a3a3c; }
+  .status.ok { background: #d7f5dd; color: #1d7a35; }
+  .status.bad { background: #fde1e1; color: #b22525; }
+  .btn {
+    display: block;
+    width: 100%;
+    border: none;
+    border-radius: 12px;
+    padding: 15px;
+    font-size: 17px;
+    font-weight: 600;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .btn.primary { background: #2a63c8; color: #ffffff; }
+  .btn.secondary { background: #e5e5ea; color: #1c1c1e; }
+  .btn.warn { background: #fde1e1; color: #b22525; }
+  .btn:disabled { opacity: 0.5; }
+  .btn.small {
+    width: auto;
+    padding: 8px 12px;
+    font-size: 14px;
+    border-radius: 9px;
+    display: inline-block;
+  }
+  .hint { font-size: 13px; color: #8e8e93; text-align: center; line-height: 1.4; }
+  .field-label { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+  input[type="text"], select, textarea {
+    width: 100%;
+    border: 1px solid #c7c7cc;
+    border-radius: 10px;
+    padding: 12px;
+    font-size: 16px;
+    background: #ffffff;
+    font-family: inherit;
+    color: inherit;
+  }
+  input[type="text"]:focus, select:focus, textarea:focus {
+    outline: 2px solid #2a63c8;
+    border-color: #2a63c8;
+  }
+  textarea { min-height: 110px; resize: vertical; }
+  .err-line { color: #b22525; font-size: 14px; font-weight: 600; min-height: 18px; }
+  .guest-name { font-size: 26px; font-weight: 700; text-align: center; }
+  .guest-sub { font-size: 16px; color: #3a3a3c; text-align: center; }
+  .guest-status {
+    font-size: 16px;
+    font-weight: 700;
+    text-align: center;
+    padding: 10px;
+    border-radius: 10px;
+  }
+  .guest-status.invited { background: #e8f0fe; color: #2a63c8; }
+  .guest-status.arrived { background: #d7f5dd; color: #1d7a35; }
+  .qr-stub {
+    border: 2px dashed #c7c7cc;
+    border-radius: 14px;
+    padding: 40px 16px;
+    text-align: center;
+    color: #8e8e93;
+    font-size: 14px;
+    line-height: 1.4;
+  }
+  .stage-note {
+    background: #fff6db;
+    border-radius: 10px;
+    padding: 12px;
+    font-size: 14px;
+    color: #7a5c00;
+    line-height: 1.4;
+  }
+
+  /* ==== Панель организатора ==== */
+  .org-toolbar {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .org-toolbar .btn { padding: 12px; font-size: 15px; }
+  .counters {
+    background: #ffffff;
+    border-radius: 14px;
+    padding: 14px 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+  .counters .big { font-size: 19px; font-weight: 700; margin-bottom: 6px; }
+  .counters .by-cat { font-size: 13px; color: #3a3a3c; line-height: 1.6; }
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; }
+  .chip {
+    border: none;
+    background: #e5e5ea;
+    color: #1c1c1e;
+    border-radius: 999px;
+    padding: 8px 14px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .chip.on { background: #2a63c8; color: #ffffff; }
+  .g-card {
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 12px 14px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.07);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .g-top { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+  .g-name { font-size: 16px; font-weight: 700; }
+  .g-game { font-size: 13px; color: #8e8e93; font-weight: 400; }
+  .g-cat {
+    font-size: 12px;
+    background: #eef1f6;
+    color: #3a3a3c;
+    border-radius: 999px;
+    padding: 3px 9px;
+    white-space: nowrap;
+  }
+  .g-state { font-size: 13px; font-weight: 700; }
+  .g-state.arrived { color: #1d7a35; }
+  .g-state.invited { color: #2a63c8; }
+  .g-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .g-comment { font-size: 13px; color: #8e8e93; }
+  #guest-list { display: flex; flex-direction: column; gap: 10px; }
+  .empty-note {
+    text-align: center;
+    color: #8e8e93;
+    font-size: 14px;
+    padding: 24px 10px;
+  }
+
+  /* ==== Окна поверх ==== */
+  .overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.45);
+    z-index: 50;
+    padding: 16px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .overlay.open { display: block; }
+  .modal {
+    max-width: 520px;
+    margin: 24px auto;
+    background: #ffffff;
+    border-radius: 16px;
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .modal h2 { font-size: 18px; }
+  .modal .row2 { display: flex; gap: 8px; }
+  .modal .row2 .btn { flex: 1; }
+  .prev-wrap { overflow-x: auto; border: 1px solid #e5e5ea; border-radius: 10px; }
+  table.prev { border-collapse: collapse; font-size: 12px; min-width: 100%; }
+  table.prev td, table.prev th {
+    border: 1px solid #e5e5ea;
+    padding: 5px 7px;
+    white-space: nowrap;
+    max-width: 140px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: left;
+  }
+  table.prev th { background: #f2f2f7; font-weight: 700; }
+  .map-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 10px;
+    align-items: center;
+    font-size: 14px;
+  }
+  .map-grid select { padding: 8px; font-size: 14px; }
+  .check-row { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+  .check-row input { width: 20px; height: 20px; }
+
+  #toast {
+    position: fixed;
+    left: 50%;
+    bottom: 24px;
+    transform: translateX(-50%);
+    background: #1c1c1e;
+    color: #ffffff;
+    padding: 12px 18px;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 600;
+    z-index: 99;
+    display: none;
+    max-width: 90%;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="topbar">
+    <h1>Чек-ин турнира</h1>
+    <span class="ver" id="ver"></span>
+  </div>
+
+  <div class="screen" id="screen-loading">
+    <div class="status wait" id="load-status">Подключение к базе...</div>
+  </div>
+
+  <div class="screen" id="screen-offline">
+    <div class="status bad">Нет связи с базой. Проверьте интернет.</div>
+    <div class="card hint" id="offline-detail"></div>
+    <button class="btn primary" id="btn-retry">Повторить</button>
+  </div>
+
+  <div class="screen" id="screen-start">
+    <div class="status ok">Связь с базой есть</div>
+    <div class="card" style="display:flex; flex-direction:column; gap:12px;">
+      <button class="btn primary" id="btn-mode-org">Режим организатора</button>
+      <button class="btn secondary" id="btn-mode-scan">Режим сканера</button>
+    </div>
+    <div class="hint">Гости заходят по персональной ссылке из приглашения, код им не нужен.</div>
+  </div>
+
+  <div class="screen" id="screen-code">
+    <div class="card" style="display:flex; flex-direction:column; gap:12px;">
+      <div class="field-label" id="code-title">Код доступа</div>
+      <input type="text" id="code-input" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Введите код">
+      <div class="err-line" id="code-err"></div>
+      <button class="btn primary" id="btn-code-enter">Войти</button>
+      <button class="btn secondary" id="btn-code-back">Назад</button>
+    </div>
+  </div>
+
+  <!-- ==== Панель организатора ==== -->
+  <div class="screen" id="screen-org">
+    <div class="counters" id="org-counters"></div>
+    <div class="org-toolbar">
+      <button class="btn primary" id="btn-add-guest">Добавить гостя</button>
+      <button class="btn secondary" id="btn-import">Импорт из таблицы</button>
+      <button class="btn secondary" id="btn-codes">Коды доступа</button>
+      <button class="btn secondary" id="btn-refresh">Обновить список</button>
+    </div>
+    <input type="text" id="org-search" placeholder="Поиск: имя, псевдоним, категория" autocomplete="off">
+    <div class="chips" id="chips-status">
+      <button class="chip on" data-st="all">Все</button>
+      <button class="chip" data-st="arrived">Пришли</button>
+      <button class="chip" data-st="waiting">Не пришли</button>
+    </div>
+    <select id="org-cat-filter"></select>
+    <div id="guest-list"></div>
+    <button class="btn warn" id="btn-org-exit">Выйти из режима организатора</button>
+  </div>
+
+  <div class="screen" id="screen-scan">
+    <div class="status ok">Режим сканера</div>
+    <div class="card stage-note">Вход выполнен. Камера, распознавание QR и отметка прихода появятся на этапе 7.</div>
+    <button class="btn warn" id="btn-scan-exit">Выйти</button>
+  </div>
+
+  <div class="screen" id="screen-guest">
+    <div class="card" style="display:flex; flex-direction:column; gap:12px;">
+      <div class="guest-name" id="guest-name"></div>
+      <div class="guest-sub" id="guest-cat"></div>
+      <div class="guest-status invited" id="guest-status"></div>
+      <div class="qr-stub">Здесь будет ваш QR-код.<br>Появится на следующем этапе разработки.</div>
+    </div>
+    <div class="hint">Покажите этот экран встречающему на входе.</div>
+  </div>
+
+  <div class="screen" id="screen-guest-bad">
+    <div class="status bad">Ссылка недействительна</div>
+    <div class="card hint">Гость с таким кодом не найден. Проверьте ссылку из приглашения или обратитесь к организатору.</div>
+  </div>
+</div>
+
+<!-- ==== Окно: добавить / изменить гостя ==== -->
+<div class="overlay" id="ov-guest">
+  <div class="modal">
+    <h2 id="gm-title">Добавить гостя</h2>
+    <div>
+      <div class="field-label">Имя и фамилия *</div>
+      <input type="text" id="gm-name" autocomplete="off">
+    </div>
+    <div>
+      <div class="field-label">Игровое имя / псевдоним</div>
+      <input type="text" id="gm-game" autocomplete="off">
+    </div>
+    <div>
+      <div class="field-label">Телефон</div>
+      <input type="text" id="gm-phone" autocomplete="off" inputmode="tel">
+    </div>
+    <div>
+      <div class="field-label">Электронная почта</div>
+      <input type="text" id="gm-email" autocomplete="off" inputmode="email">
+    </div>
+    <div>
+      <div class="field-label">Категория</div>
+      <select id="gm-cat"></select>
+      <input type="text" id="gm-cat-new" placeholder="Название новой категории" style="display:none; margin-top:8px;" autocomplete="off">
+    </div>
+    <div>
+      <div class="field-label">Комментарий</div>
+      <input type="text" id="gm-comment" autocomplete="off">
+    </div>
+    <div class="err-line" id="gm-err"></div>
+    <div class="row2">
+      <button class="btn primary" id="gm-save">Сохранить</button>
+      <button class="btn secondary" id="gm-cancel">Отмена</button>
+    </div>
+  </div>
+</div>
+
+<!-- ==== Окно: импорт ==== -->
+<div class="overlay" id="ov-import">
+  <div class="modal">
+    <h2>Импорт гостей из таблицы</h2>
+    <div id="imp-step1" style="display:flex; flex-direction:column; gap:12px;">
+      <div class="hint" style="text-align:left;">
+        Способ 1: выделите строки в Excel или Гугл-таблице, скопируйте и вставьте в поле ниже.<br>
+        Способ 2: загрузите файл CSV (выгрузка ответов Гугл-формы или "Сохранить как CSV" в Excel).
+      </div>
+      <textarea id="imp-text" placeholder="Вставьте сюда строки из таблицы"></textarea>
+      <button class="btn secondary" id="imp-file-btn">Выбрать файл CSV</button>
+      <input type="file" id="imp-file" accept=".csv,.tsv,.txt" style="display:none;">
+      <div class="err-line" id="imp-err1"></div>
+      <div class="row2">
+        <button class="btn primary" id="imp-parse">Разобрать</button>
+        <button class="btn secondary" id="imp-cancel1">Отмена</button>
+      </div>
+    </div>
+    <div id="imp-step2" style="display:none; flex-direction:column; gap:12px;">
+      <div class="check-row">
+        <input type="checkbox" id="imp-has-header" checked>
+        <label for="imp-has-header">Первая строка - заголовки, не импортировать</label>
+      </div>
+      <div class="prev-wrap"><table class="prev" id="imp-preview"></table></div>
+      <div class="field-label">Сопоставление колонок</div>
+      <div class="map-grid">
+        <span>Имя и фамилия *</span><select id="map-fio"></select>
+        <span>+ вторая колонка (если фамилия отдельно)</span><select id="map-fio2"></select>
+        <span>Игровое имя</span><select id="map-game"></select>
+        <span>Телефон</span><select id="map-phone"></select>
+        <span>Почта</span><select id="map-email"></select>
+        <span>Категория</span><select id="map-cat"></select>
+        <span>Комментарий</span><select id="map-comment"></select>
+      </div>
+      <div>
+        <div class="field-label">Категория по умолчанию (если колонки нет или пусто)</div>
+        <select id="imp-default-cat"></select>
+      </div>
+      <div class="err-line" id="imp-err2"></div>
+      <div class="row2">
+        <button class="btn primary" id="imp-do">Импортировать</button>
+        <button class="btn secondary" id="imp-back">Назад</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==== Окно: коды доступа ==== -->
+<div class="overlay" id="ov-codes">
+  <div class="modal">
+    <h2>Коды доступа</h2>
+    <div>
+      <div class="field-label">Код организатора</div>
+      <input type="text" id="cd-org" autocomplete="off" autocapitalize="off" spellcheck="false">
+    </div>
+    <div>
+      <div class="field-label">Код встречающего</div>
+      <input type="text" id="cd-scan" autocomplete="off" autocapitalize="off" spellcheck="false">
+    </div>
+    <div class="check-row">
+      <input type="checkbox" id="cd-require">
+      <label for="cd-require">Требовать код для входа в сканер</label>
+    </div>
+    <div class="hint" style="text-align:left;">Новые коды начинают действовать сразу. Сообщите встречающим, если меняете их код.</div>
+    <div class="err-line" id="cd-err"></div>
+    <div class="row2">
+      <button class="btn primary" id="cd-save">Сохранить</button>
+      <button class="btn secondary" id="cd-cancel">Отмена</button>
+    </div>
+  </div>
+</div>
+
+<!-- ==== Окно: подтверждение ==== -->
+<div class="overlay" id="ov-confirm">
+  <div class="modal">
+    <div id="cf-text" style="font-size:16px; line-height:1.4;"></div>
+    <div class="row2">
+      <button class="btn warn" id="cf-yes">Да</button>
+      <button class="btn secondary" id="cf-no">Отмена</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ==== Настройки подключения ==== */
+  var PROXY_BASE = "https://checkin-proxy.nsolyankin.deno.net";
+  var SUPABASE_KEY = "VSTAVTE_SJUDA_KLJUCH_SUPABASE";
+  var APP_VERSION = "0.2 (этап 4)";
+
+  /* ==== Состояние ==== */
+  var settings = null;
+  var codeContext = null; /* "org" или "scan" */
+  var guests = [];
+  var filterStatus = "all"; /* all | arrived | waiting */
+  var filterCat = "all";
+  var searchStr = "";
+  var editingId = null;
+  var importRows = [];
+  var confirmCb = null;
+  var toastTimer = null;
+
+  /* ==== Утилиты ==== */
+  function qs(id) { return document.getElementById(id); }
+
+  function esc(s) {
+    if (s === null || s === undefined) { return ""; }
+    return String(s)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function showScreen(id) {
+    var screens = document.querySelectorAll(".screen");
+    var i;
+    for (i = 0; i < screens.length; i++) {
+      screens[i].classList.remove("active");
+    }
+    qs(id).classList.add("active");
+  }
+
+  function openOv(id) { qs(id).classList.add("open"); }
+  function closeOv(id) { qs(id).classList.remove("open"); }
+
+  function toast(msg) {
+    var t = qs("toast");
+    t.textContent = msg;
+    t.style.display = "block";
+    if (toastTimer) { clearTimeout(toastTimer); }
+    toastTimer = setTimeout(function () { t.style.display = "none"; }, 3000);
+  }
+
+  function getParam(name) {
+    var query = window.location.search.substring(1);
+    var parts = query.split("&");
+    var i, pair;
+    for (i = 0; i < parts.length; i++) {
+      pair = parts[i].split("=");
+      if (decodeURIComponent(pair[0]) === name) {
+        return decodeURIComponent(pair[1] || "");
+      }
+    }
+    return null;
+  }
+
+  function fmtTime(iso) {
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) { return ""; }
+    var h = d.getHours();
+    var m = d.getMinutes();
+    return (h < 10 ? "0" : "") + h + ":" + (m < 10 ? "0" : "") + m;
+  }
+
+  function genToken() {
+    var chars = "abcdefghjkmnpqrstuvwxyz23456789";
+    var arr = new Uint32Array(14);
+    var s = "";
+    var i;
+    if (window.crypto && window.crypto.getRandomValues) {
+      window.crypto.getRandomValues(arr);
+      for (i = 0; i < arr.length; i++) { s += chars[arr[i] % chars.length]; }
+    } else {
+      for (i = 0; i < 14; i++) {
+        s += chars[Math.floor(Math.random() * chars.length)];
+      }
+    }
+    return s;
+  }
+
+  /* ==== Работа с базой через прокси ==== */
+  function api(path, options) {
+    options = options || {};
+    var headers = {
+      "apikey": SUPABASE_KEY,
+      "Authorization": "Bearer " + SUPABASE_KEY,
+      "Content-Type": "application/json"
+    };
+    if (options.prefer) { headers["Prefer"] = options.prefer; }
+    var init = {
+      method: options.method || "GET",
+      headers: headers
+    };
+    if (options.body !== undefined) { init.body = JSON.stringify(options.body); }
+    return fetch(PROXY_BASE + path, init).then(function (resp) {
+      if (!resp.ok) {
+        return resp.text().then(function (t) {
+          throw new Error("HTTP " + resp.status + (t ? " " + t.slice(0, 180) : ""));
+        });
+      }
+      return resp.text().then(function (t) {
+        return t ? JSON.parse(t) : null;
+      });
+    });
+  }
+
+  function loadSettings() {
+    return api("/rest/v1/settings?id=eq.1&select=organizer_code,scanner_code,require_scanner_code,categories")
+      .then(function (rows) {
+        if (!rows || rows.length === 0) {
+          throw new Error("В базе нет строки настроек");
+        }
+        settings = rows[0];
+        if (!settings.categories || !settings.categories.length) {
+          settings.categories = ["гость"];
+        }
+        return settings;
+      });
+  }
+
+  function loadGuests() {
+    return api("/rest/v1/guests?select=*&order=first_last_name.asc")
+      .then(function (rows) {
+        guests = rows || [];
+      });
+  }
+
+  function loadGuestByToken(token) {
+    var path = "/rest/v1/guests?token=eq." + encodeURIComponent(token) +
+      "&select=first_last_name,game_name,category,status,arrived_at";
+    return api(path).then(function (rows) {
+      if (!rows || rows.length === 0) { return null; }
+      return rows[0];
+    });
+  }
+
+  /* ==== Сессия ==== */
+  function saveSession(role, code) {
+    try {
+      sessionStorage.setItem("checkin_role", role);
+      sessionStorage.setItem("checkin_code", code);
+    } catch (e) { /* приватный режим Safari, не критично */ }
+  }
+
+  function clearSession() {
+    try {
+      sessionStorage.removeItem("checkin_role");
+      sessionStorage.removeItem("checkin_code");
+    } catch (e) { /* не критично */ }
+  }
+
+  function restoreSession() {
+    var role = null;
+    var code = null;
+    try {
+      role = sessionStorage.getItem("checkin_role");
+      code = sessionStorage.getItem("checkin_code");
+    } catch (e) { return false; }
+    if (!role || !settings) { return false; }
+    if (role === "org" && code === settings.organizer_code) {
+      enterOrg();
+      return true;
+    }
+    if (role === "scan") {
+      if (!settings.require_scanner_code || code === settings.scanner_code) {
+        showScreen("screen-scan");
+        return true;
+      }
+    }
+    clearSession();
+    return false;
+  }
+
+  /* ==== Экран ввода кода ==== */
+  function openCodeScreen(context) {
+    codeContext = context;
+    qs("code-title").textContent =
+      context === "org" ? "Код организатора" : "Код встречающего";
+    qs("code-input").value = "";
+    qs("code-err").textContent = "";
+    showScreen("screen-code");
+    qs("code-input").focus();
+  }
+
+  function tryEnterCode() {
+    var val = qs("code-input").value.trim();
+    if (!val) {
+      qs("code-err").textContent = "Введите код";
+      return;
+    }
+    if (codeContext === "org") {
+      if (settings.organizer_code && val === settings.organizer_code) {
+        saveSession("org", val);
+        enterOrg();
+      } else {
+        qs("code-err").textContent = "Неверный код";
+      }
+      return;
+    }
+    if (settings.scanner_code && val === settings.scanner_code) {
+      saveSession("scan", val);
+      showScreen("screen-scan");
+    } else {
+      qs("code-err").textContent = "Неверный код";
+    }
+  }
+
+  /* ==== Панель организатора ==== */
+  function enterOrg() {
+    showScreen("screen-org");
+    qs("guest-list").innerHTML = "<div class='empty-note'>Загрузка списка...</div>";
+    loadGuests().then(function () {
+      renderOrg();
+    }).catch(function (err) {
+      qs("guest-list").innerHTML =
+        "<div class='empty-note'>Не удалось загрузить список: " + esc(err.message) + "</div>";
+    });
+  }
+
+  function allCategories() {
+    var set = {};
+    var list = [];
+    var i;
+    for (i = 0; i < settings.categories.length; i++) {
+      if (!set[settings.categories[i]]) {
+        set[settings.categories[i]] = true;
+        list.push(settings.categories[i]);
+      }
+    }
+    for (i = 0; i < guests.length; i++) {
+      var c = guests[i].category;
+      if (c && !set[c]) { set[c] = true; list.push(c); }
+    }
+    return list;
+  }
+
+  function renderCatFilter() {
+    var sel = qs("org-cat-filter");
+    var cats = allCategories();
+    var html = "<option value='all'>Все категории</option>";
+    var i;
+    for (i = 0; i < cats.length; i++) {
+      html += "<option value='" + esc(cats[i]) + "'>" + esc(cats[i]) + "</option>";
+    }
+    sel.innerHTML = html;
+    sel.value = filterCat;
+    if (sel.value !== filterCat) { filterCat = "all"; sel.value = "all"; }
+  }
+
+  function renderCounters() {
+    var total = guests.length;
+    var arrived = 0;
+    var byCat = {};
+    var i, g;
+    for (i = 0; i < guests.length; i++) {
+      g = guests[i];
+      var c = g.category || "без категории";
+      if (!byCat[c]) { byCat[c] = { total: 0, arrived: 0 }; }
+      byCat[c].total++;
+      if (g.status === "пришел") { arrived++; byCat[c].arrived++; }
+    }
+    var html = "<div class='big'>Пришло " + arrived + " из " + total + "</div>";
+    var parts = [];
+    var key;
+    for (key in byCat) {
+      if (Object.prototype.hasOwnProperty.call(byCat, key)) {
+        parts.push(esc(key) + ": " + byCat[key].arrived + "/" + byCat[key].total);
+      }
+    }
+    html += "<div class='by-cat'>" + (parts.length ? parts.join(" &middot; ") : "Список пуст") + "</div>";
+    qs("org-counters").innerHTML = html;
+  }
+
+  function guestMatches(g) {
+    if (filterStatus === "arrived" && g.status !== "пришел") { return false; }
+    if (filterStatus === "waiting" && g.status === "пришел") { return false; }
+    if (filterCat !== "all" && (g.category || "") !== filterCat) { return false; }
+    if (searchStr) {
+      var hay = ((g.first_last_name || "") + " " + (g.game_name || "") + " " +
+        (g.category || "")).toLowerCase();
+      if (hay.indexOf(searchStr) === -1) { return false; }
+    }
+    return true;
+  }
+
+  function renderList() {
+    var box = qs("guest-list");
+    var html = "";
+    var shown = 0;
+    var i, g;
+    for (i = 0; i < guests.length; i++) {
+      g = guests[i];
+      if (!guestMatches(g)) { continue; }
+      shown++;
+      var arrived = g.status === "пришел";
+      var stText = arrived
+        ? ("Пришел" + (g.arrived_at ? " в " + fmtTime(g.arrived_at) : "") +
+           (g.checked_by ? " (" + esc(g.checked_by) + ")" : ""))
+        : "Приглашен";
+      html += "<div class='g-card'>" +
+        "<div class='g-top'><div><span class='g-name'>" + esc(g.first_last_name) + "</span>" +
+        (g.game_name ? " <span class='g-game'>" + esc(g.game_name) + "</span>" : "") +
+        "</div><span class='g-cat'>" + esc(g.category || "-") + "</span></div>" +
+        "<div class='g-state " + (arrived ? "arrived" : "invited") + "'>" + stText + "</div>" +
+        (g.comment ? "<div class='g-comment'>" + esc(g.comment) + "</div>" : "") +
+        "<div class='g-actions'>" +
+        (arrived
+          ? "<button class='btn small secondary' data-act='unmark' data-id='" + g.id + "'>Снять отметку</button>"
+          : "<button class='btn small primary' data-act='mark' data-id='" + g.id + "'>Отметить приход</button>") +
+        "<button class='btn small secondary' data-act='edit' data-id='" + g.id + "'>Изменить</button>" +
+        "<button class='btn small warn' data-act='del' data-id='" + g.id + "'>Удалить</button>" +
+        "</div></div>";
+    }
+    if (!shown) {
+      html = "<div class='empty-note'>" +
+        (guests.length ? "Никого не найдено по заданным условиям" :
+          "Список пуст. Добавьте гостя или сделайте импорт из таблицы.") + "</div>";
+    }
+    box.innerHTML = html;
+  }
+
+  function renderOrg() {
+    renderCounters();
+    renderCatFilter();
+    renderList();
+  }
+
+  function findGuest(id) {
+    var i;
+    for (i = 0; i < guests.length; i++) {
+      if (String(guests[i].id) === String(id)) { return guests[i]; }
+    }
+    return null;
+  }
+
+  /* ==== Действия с гостем ==== */
+  function markGuest(g) {
+    var body = {
+      status: "пришел",
+      arrived_at: new Date().toISOString(),
+      checked_by: "организатор"
+    };
+    api("/rest/v1/guests?id=eq." + g.id, { method: "PATCH", body: body, prefer: "return=minimal" })
+      .then(function () {
+        toast(g.first_last_name + ": приход отмечен");
+        return loadGuests();
+      })
+      .then(renderOrg)
+      .catch(function (err) { toast("Ошибка: " + err.message); });
+  }
+
+  function unmarkGuest(g) {
+    var body = { status: "приглашен", arrived_at: null, checked_by: null };
+    api("/rest/v1/guests?id=eq." + g.id, { method: "PATCH", body: body, prefer: "return=minimal" })
+      .then(function () {
+        toast(g.first_last_name + ": отметка снята");
+        return loadGuests();
+      })
+      .then(renderOrg)
+      .catch(function (err) { toast("Ошибка: " + err.message); });
+  }
+
+  function deleteGuest(g) {
+    askConfirm("Удалить гостя \"" + g.first_last_name + "\"? Его QR-код перестанет действовать.", function () {
+      api("/rest/v1/guests?id=eq." + g.id, { method: "DELETE", prefer: "return=minimal" })
+        .then(function () {
+          toast("Гость удален");
+          return loadGuests();
+        })
+        .then(renderOrg)
+        .catch(function (err) { toast("Ошибка: " + err.message); });
+    });
+  }
+
+  /* ==== Окно гостя (добавить / изменить) ==== */
+  function fillCatSelect(sel, selected) {
+    var cats = allCategories();
+    var html = "";
+    var i;
+    for (i = 0; i < cats.length; i++) {
+      html += "<option value='" + esc(cats[i]) + "'>" + esc(cats[i]) + "</option>";
+    }
+    html += "<option value='__new__'>+ Своя категория...</option>";
+    sel.innerHTML = html;
+    if (selected && cats.indexOf(selected) !== -1) { sel.value = selected; }
+  }
+
+  function openGuestModal(g) {
+    editingId = g ? g.id : null;
+    qs("gm-title").textContent = g ? "Изменить гостя" : "Добавить гостя";
+    qs("gm-name").value = g ? (g.first_last_name || "") : "";
+    qs("gm-game").value = g ? (g.game_name || "") : "";
+    qs("gm-phone").value = g ? (g.phone || "") : "";
+    qs("gm-email").value = g ? (g.email || "") : "";
+    qs("gm-comment").value = g ? (g.comment || "") : "";
+    fillCatSelect(qs("gm-cat"), g ? g.category : null);
+    qs("gm-cat-new").style.display = "none";
+    qs("gm-cat-new").value = "";
+    qs("gm-err").textContent = "";
+    openOv("ov-guest");
+  }
+
+  function ensureCategorySaved(cat) {
+    if (settings.categories.indexOf(cat) !== -1) { return Promise.resolve(); }
+    var next = settings.categories.concat([cat]);
+    return api("/rest/v1/settings?id=eq.1", {
+      method: "PATCH",
+      body: { categories: next, updated_at: new Date().toISOString() },
+      prefer: "return=minimal"
+    }).then(function () {
+      settings.categories = next;
+    });
+  }
+
+  function saveGuestModal() {
+    var name = qs("gm-name").value.trim();
+    if (!name) {
+      qs("gm-err").textContent = "Имя и фамилия обязательны";
+      return;
+    }
+    var cat = qs("gm-cat").value;
+    if (cat === "__new__") {
+      cat = qs("gm-cat-new").value.trim();
+      if (!cat) {
+        qs("gm-err").textContent = "Введите название новой категории";
+        return;
+      }
+    }
+    var body = {
+      first_last_name: name,
+      game_name: qs("gm-game").value.trim() || null,
+      phone: qs("gm-phone").value.trim() || null,
+      email: qs("gm-email").value.trim() || null,
+      category: cat,
+      comment: qs("gm-comment").value.trim() || null
+    };
+    qs("gm-save").disabled = true;
+    ensureCategorySaved(cat).then(function () {
+      if (editingId) {
+        return api("/rest/v1/guests?id=eq." + editingId,
+          { method: "PATCH", body: body, prefer: "return=minimal" });
+      }
+      body.token = genToken();
+      body.status = "приглашен";
+      return api("/rest/v1/guests",
+        { method: "POST", body: body, prefer: "return=minimal" });
+    }).then(function () {
+      closeOv("ov-guest");
+      toast(editingId ? "Изменения сохранены" : "Гость добавлен");
+      return loadGuests();
+    }).then(renderOrg).catch(function (err) {
+      qs("gm-err").textContent = "Ошибка: " + err.message;
+    }).then(function () {
+      qs("gm-save").disabled = false;
+    });
+  }
+
+  /* ==== Коды доступа ==== */
+  function openCodesModal() {
+    qs("cd-org").value = settings.organizer_code || "";
+    qs("cd-scan").value = settings.scanner_code || "";
+    qs("cd-require").checked = !!settings.require_scanner_code;
+    qs("cd-err").textContent = "";
+    openOv("ov-codes");
+  }
+
+  function saveCodesModal() {
+    var orgCode = qs("cd-org").value.trim();
+    var scanCode = qs("cd-scan").value.trim();
+    var req = qs("cd-require").checked;
+    if (!orgCode) {
+      qs("cd-err").textContent = "Код организатора не может быть пустым";
+      return;
+    }
+    if (req && !scanCode) {
+      qs("cd-err").textContent = "Код встречающего пуст, а вход по коду включен";
+      return;
+    }
+    qs("cd-save").disabled = true;
+    api("/rest/v1/settings?id=eq.1", {
+      method: "PATCH",
+      body: {
+        organizer_code: orgCode,
+        scanner_code: scanCode,
+        require_scanner_code: req,
+        updated_at: new Date().toISOString()
+      },
+      prefer: "return=minimal"
+    }).then(function () {
+      settings.organizer_code = orgCode;
+      settings.scanner_code = scanCode;
+      settings.require_scanner_code = req;
+      saveSession("org", orgCode);
+      closeOv("ov-codes");
+      toast("Коды сохранены");
+    }).catch(function (err) {
+      qs("cd-err").textContent = "Ошибка: " + err.message;
+    }).then(function () {
+      qs("cd-save").disabled = false;
+    });
+  }
+
+  /* ==== Импорт ==== */
+  function openImportModal() {
+    importRows = [];
+    qs("imp-text").value = "";
+    qs("imp-err1").textContent = "";
+    qs("imp-err2").textContent = "";
+    qs("imp-step1").style.display = "flex";
+    qs("imp-step2").style.display = "none";
+    openOv("ov-import");
+  }
+
+  function detectDelim(text) {
+    var line = "";
+    var lines = text.split(/\r?\n/);
+    var i;
+    for (i = 0; i < lines.length; i++) {
+      if (lines[i].trim() !== "") { line = lines[i]; break; }
+    }
+    var cand = ["\t", ";", ","];
+    var best = "\t";
+    var bestCount = -1;
+    for (i = 0; i < cand.length; i++) {
+      var cnt = line.split(cand[i]).length - 1;
+      if (cnt > bestCount) { bestCount = cnt; best = cand[i]; }
+    }
+    return best;
+  }
+
+  function parseDelimited(text, delim) {
+    var rows = [];
+    var row = [];
+    var cur = "";
+    var inQ = false;
+    var i, ch;
+    text = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+    for (i = 0; i < text.length; i++) {
+      ch = text[i];
+      if (inQ) {
+        if (ch === "\"") {
+          if (text[i + 1] === "\"") { cur += "\""; i++; }
+          else { inQ = false; }
+        } else { cur += ch; }
+      } else {
+        if (ch === "\"") { inQ = true; }
+        else if (ch === delim) { row.push(cur); cur = ""; }
+        else if (ch === "\n") { row.push(cur); rows.push(row); row = []; cur = ""; }
+        else { cur += ch; }
+      }
+    }
+    if (cur !== "" || row.length) { row.push(cur); rows.push(row); }
+    return rows.filter(function (r) {
+      return r.some(function (c) { return String(c).trim() !== ""; });
+    });
+  }
+
+  function parseImportText(text) {
+    var t = (text || "").trim();
+    if (!t) { return []; }
+    return parseDelimited(t, detectDelim(t));
+  }
+
+  function colLabel(idx) {
+    var first = importRows[0] || [];
+    var h = (first[idx] || "").trim();
+    if (qs("imp-has-header").checked && h) {
+      return h.length > 24 ? h.slice(0, 24) + "..." : h;
+    }
+    return "Колонка " + (idx + 1);
+  }
+
+  function fillMapSelects() {
+    var nCols = 0;
+    var i, j;
+    for (i = 0; i < importRows.length; i++) {
+      if (importRows[i].length > nCols) { nCols = importRows[i].length; }
+    }
+    var ids = ["map-fio", "map-fio2", "map-game", "map-phone", "map-email", "map-cat", "map-comment"];
+    for (j = 0; j < ids.length; j++) {
+      var html = "<option value='-1'>нет</option>";
+      for (i = 0; i < nCols; i++) {
+        html += "<option value='" + i + "'>" + esc(colLabel(i)) + "</option>";
+      }
+      qs(ids[j]).innerHTML = html;
+    }
+    guessMapping(nCols);
+  }
+
+  function guessMapping(nCols) {
+    if (!qs("imp-has-header").checked) {
+      qs("map-fio").value = "0";
+      return;
+    }
+    var headers = importRows[0] || [];
+    var used = {};
+    function match(id, keys, exclude) {
+      var i, k, h;
+      for (i = 0; i < nCols; i++) {
+        if (used[i]) { continue; }
+        h = String(headers[i] || "").toLowerCase();
+        if (exclude && exclude.some(function (x) { return h.indexOf(x) !== -1; })) { continue; }
+        for (k = 0; k < keys.length; k++) {
+          if (h.indexOf(keys[k]) !== -1) {
+            qs(id).value = String(i);
+            used[i] = true;
+            return true;
+          }
+        }
+      }
+      return false;
+    }
+    /* отметка времени гугл-формы не сопоставляется никуда */
+    var i, h;
+    for (i = 0; i < nCols; i++) {
+      h = String(headers[i] || "").toLowerCase();
+      if (h.indexOf("отметка времени") !== -1 || h.indexOf("timestamp") !== -1) {
+        used[i] = true;
+      }
+    }
+    var fioFound = match("map-fio", ["фио", "имя и фамилия", "имя, фамилия", "фамилия имя", "фамилия и имя"]);
+    if (!fioFound) {
+      fioFound = match("map-fio", ["имя", "name"], ["игров", "псевдоним", "ник", "польз"]);
+      match("map-fio2", ["фамилия", "surname", "last"]);
+    }
+    if (!fioFound) { qs("map-fio").value = "0"; }
+    match("map-game", ["игров", "псевдоним", "ник", "nick"]);
+    match("map-phone", ["телефон", "phone", "тел."]);
+    match("map-email", ["почта", "email", "e-mail", "мейл", "мэйл"]);
+    match("map-cat", ["категор", "роль"]);
+    match("map-comment", ["комментар", "примечан", "comment", "пожелан"]);
+  }
+
+  function renderImportPreview() {
+    var tbl = qs("imp-preview");
+    var hasHeader = qs("imp-has-header").checked;
+    var html = "";
+    var maxRows = Math.min(importRows.length, hasHeader ? 6 : 5);
+    var i, j, row, tag;
+    for (i = 0; i < maxRows; i++) {
+      row = importRows[i];
+      tag = (hasHeader && i === 0) ? "th" : "td";
+      html += "<tr>";
+      for (j = 0; j < row.length; j++) {
+        html += "<" + tag + ">" + esc(row[j]) + "</" + tag + ">";
+      }
+      html += "</tr>";
+    }
+    tbl.innerHTML = html;
+    var note = importRows.length - (hasHeader ? 1 : 0);
+    qs("imp-err2").textContent = "";
+    qs("imp-do").textContent = "Импортировать (" + Math.max(note, 0) + " строк)";
+  }
+
+  function fillDefaultCatSelect() {
+    var sel = qs("imp-default-cat");
+    var cats = allCategories();
+    var html = "";
+    var i;
+    for (i = 0; i < cats.length; i++) {
+      html += "<option value='" + esc(cats[i]) + "'>" + esc(cats[i]) + "</option>";
+    }
+    sel.innerHTML = html;
+  }
+
+  function goImportStep2() {
+    if (!importRows.length) {
+      qs("imp-err1").textContent = "Не удалось разобрать данные. Проверьте, что вставлены строки таблицы.";
+      return;
+    }
+    qs("imp-step1").style.display = "none";
+    qs("imp-step2").style.display = "flex";
+    fillMapSelects();
+    fillDefaultCatSelect();
+    renderImportPreview();
+  }
+
+  function readImportFile(file) {
+    var reader = new FileReader();
+    reader.onload = function () {
+      var buf = reader.result;
+      var text = "";
+      try {
+        text = new TextDecoder("utf-8", { fatal: true }).decode(buf);
+      } catch (e) {
+        try {
+          text = new TextDecoder("windows-1251").decode(buf);
+        } catch (e2) {
+          qs("imp-err1").textContent = "Не удалось прочитать файл (кодировка)";
+          return;
+        }
+      }
+      importRows = parseImportText(text);
+      if (!importRows.length) {
+        qs("imp-err1").textContent = "Файл пуст или не распознан";
+        return;
+      }
+      goImportStep2();
+    };
+    reader.onerror = function () {
+      qs("imp-err1").textContent = "Не удалось прочитать файл";
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  function cellOf(row, selId) {
+    var idx = parseInt(qs(selId).value, 10);
+    if (idx < 0 || idx >= row.length) { return ""; }
+    return String(row[idx] || "").trim();
+  }
+
+  function doImport() {
+    var hasHeader = qs("imp-has-header").checked;
+    var start = hasHeader ? 1 : 0;
+    var fioIdx = parseInt(qs("map-fio").value, 10);
+    if (fioIdx < 0) {
+      qs("imp-err2").textContent = "Укажите колонку с именем и фамилией";
+      return;
+    }
+    var defCat = qs("imp-default-cat").value || "гость";
+    var existing = {};
+    var i;
+    for (i = 0; i < guests.length; i++) {
+      existing[guests[i].first_last_name.trim().toLowerCase()] = true;
+    }
+    var batch = [];
+    var skippedDup = 0;
+    var skippedEmpty = 0;
+    for (i = start; i < importRows.length; i++) {
+      var row = importRows[i];
+      var name = cellOf(row, "map-fio");
+      var fio2 = cellOf(row, "map-fio2");
+      if (fio2) { name = (name + " " + fio2).trim(); }
+      if (!name) { skippedEmpty++; continue; }
+      var key = name.toLowerCase();
+      if (existing[key]) { skippedDup++; continue; }
+      existing[key] = true;
+      batch.push({
+        token: genToken(),
+        first_last_name: name,
+        game_name: cellOf(row, "map-game") || null,
+        phone: cellOf(row, "map-phone") || null,
+        email: cellOf(row, "map-email") || null,
+        category: cellOf(row, "map-cat") || defCat,
+        comment: cellOf(row, "map-comment") || null,
+        status: "приглашен"
+      });
+    }
+    if (!batch.length) {
+      qs("imp-err2").textContent = "Нет строк для импорта" +
+        (skippedDup ? " (все " + skippedDup + " уже есть в списке)" : "");
+      return;
+    }
+    qs("imp-do").disabled = true;
+    api("/rest/v1/guests", { method: "POST", body: batch, prefer: "return=minimal" })
+      .then(function () {
+        closeOv("ov-import");
+        var msg = "Добавлено гостей: " + batch.length;
+        if (skippedDup) { msg += ", пропущено дублей: " + skippedDup; }
+        if (skippedEmpty) { msg += ", пустых строк: " + skippedEmpty; }
+        toast(msg);
+        return loadGuests();
+      })
+      .then(renderOrg)
+      .catch(function (err) {
+        qs("imp-err2").textContent = "Ошибка импорта: " + err.message;
+      })
+      .then(function () {
+        qs("imp-do").disabled = false;
+      });
+  }
+
+  /* ==== Подтверждение ==== */
+  function askConfirm(text, cb) {
+    qs("cf-text").textContent = text;
+    confirmCb = cb;
+    openOv("ov-confirm");
+  }
+
+  /* ==== Режим гостя ==== */
+  function openGuestScreen(guest) {
+    qs("guest-name").textContent = guest.first_last_name;
+    var sub = guest.category || "";
+    if (guest.game_name) {
+      sub = sub + (sub ? " * " : "") + guest.game_name;
+    }
+    qs("guest-cat").textContent = sub;
+    var st = qs("guest-status");
+    if (guest.status === "пришел") {
+      st.className = "guest-status arrived";
+      var t = guest.arrived_at ? fmtTime(guest.arrived_at) : "";
+      st.textContent = t ? "Пришел в " + t : "Пришел";
+    } else {
+      st.className = "guest-status invited";
+      st.textContent = "Приглашен";
+    }
+    showScreen("screen-guest");
+  }
+
+  /* ==== Запуск ==== */
+  function boot() {
+    showScreen("screen-loading");
+    var guestToken = getParam("g");
+    var mode = getParam("m");
+
+    loadSettings().then(function () {
+      if (guestToken) {
+        qs("load-status").textContent = "Ищем ваше приглашение...";
+        return loadGuestByToken(guestToken).then(function (guest) {
+          if (guest) {
+            openGuestScreen(guest);
+          } else {
+            showScreen("screen-guest-bad");
+          }
+        });
+      }
+      if (restoreSession()) { return; }
+      if (mode === "org") {
+        openCodeScreen("org");
+        return;
+      }
+      if (mode === "scan") {
+        if (settings.require_scanner_code) {
+          openCodeScreen("scan");
+        } else {
+          showScreen("screen-scan");
+        }
+        return;
+      }
+      showScreen("screen-start");
+    }).catch(function (err) {
+      qs("offline-detail").textContent =
+        "Техническая деталь: " + (err && err.message ? err.message : String(err));
+      showScreen("screen-offline");
+    });
+  }
+
+  function bindEvents() {
+    qs("btn-retry").addEventListener("click", boot);
+    qs("btn-mode-org").addEventListener("click", function () {
+      openCodeScreen("org");
+    });
+    qs("btn-mode-scan").addEventListener("click", function () {
+      if (settings && !settings.require_scanner_code) {
+        saveSession("scan", "");
+        showScreen("screen-scan");
+      } else {
+        openCodeScreen("scan");
+      }
+    });
+    qs("btn-code-enter").addEventListener("click", tryEnterCode);
+    qs("code-input").addEventListener("keydown", function (e) {
+      if (e.key === "Enter") { tryEnterCode(); }
+    });
+    qs("btn-code-back").addEventListener("click", function () {
+      showScreen("screen-start");
+    });
+    qs("btn-org-exit").addEventListener("click", function () {
+      clearSession();
+      showScreen("screen-start");
+    });
+    qs("btn-scan-exit").addEventListener("click", function () {
+      clearSession();
+      showScreen("screen-start");
+    });
+
+    /* панель организатора */
+    qs("btn-add-guest").addEventListener("click", function () { openGuestModal(null); });
+    qs("btn-import").addEventListener("click", openImportModal);
+    qs("btn-codes").addEventListener("click", openCodesModal);
+    qs("btn-refresh").addEventListener("click", function () {
+      loadGuests().then(renderOrg).then(function () { toast("Список обновлен"); })
+        .catch(function (err) { toast("Ошибка: " + err.message); });
+    });
+    qs("org-search").addEventListener("input", function () {
+      searchStr = qs("org-search").value.trim().toLowerCase();
+      renderList();
+    });
+    qs("chips-status").addEventListener("click", function (e) {
+      var b = e.target.closest ? e.target.closest(".chip") : null;
+      if (!b) { return; }
+      filterStatus = b.getAttribute("data-st");
+      var chips = qs("chips-status").querySelectorAll(".chip");
+      var i;
+      for (i = 0; i < chips.length; i++) { chips[i].classList.remove("on"); }
+      b.classList.add("on");
+      renderList();
+    });
+    qs("org-cat-filter").addEventListener("change", function () {
+      filterCat = qs("org-cat-filter").value;
+      renderList();
+    });
+    qs("guest-list").addEventListener("click", function (e) {
+      var b = e.target.closest ? e.target.closest("button[data-act]") : null;
+      if (!b) { return; }
+      var g = findGuest(b.getAttribute("data-id"));
+      if (!g) { return; }
+      var act = b.getAttribute("data-act");
+      if (act === "mark") { markGuest(g); }
+      else if (act === "unmark") { unmarkGuest(g); }
+      else if (act === "edit") { openGuestModal(g); }
+      else if (act === "del") { deleteGuest(g); }
+    });
+
+    /* окно гостя */
+    qs("gm-cat").addEventListener("change", function () {
+      qs("gm-cat-new").style.display =
+        qs("gm-cat").value === "__new__" ? "block" : "none";
+    });
+    qs("gm-save").addEventListener("click", saveGuestModal);
+    qs("gm-cancel").addEventListener("click", function () { closeOv("ov-guest"); });
+
+    /* окно кодов */
+    qs("cd-save").addEventListener("click", saveCodesModal);
+    qs("cd-cancel").addEventListener("click", function () { closeOv("ov-codes"); });
+
+    /* окно импорта */
+    qs("imp-file-btn").addEventListener("click", function () { qs("imp-file").click(); });
+    qs("imp-file").addEventListener("change", function () {
+      if (qs("imp-file").files && qs("imp-file").files[0]) {
+        readImportFile(qs("imp-file").files[0]);
+        qs("imp-file").value = "";
+      }
+    });
+    qs("imp-parse").addEventListener("click", function () {
+      importRows = parseImportText(qs("imp-text").value);
+      goImportStep2();
+    });
+    qs("imp-cancel1").addEventListener("click", function () { closeOv("ov-import"); });
+    qs("imp-back").addEventListener("click", function () {
+      qs("imp-step2").style.display = "none";
+      qs("imp-step1").style.display = "flex";
+    });
+    qs("imp-has-header").addEventListener("change", function () {
+      fillMapSelects();
+      renderImportPreview();
+    });
+    qs("imp-do").addEventListener("click", doImport);
+
+    /* подтверждение */
+    qs("cf-yes").addEventListener("click", function () {
+      closeOv("ov-confirm");
+      if (confirmCb) { var cb = confirmCb; confirmCb = null; cb(); }
+    });
+    qs("cf-no").addEventListener("click", function () {
+      confirmCb = null;
+      closeOv("ov-confirm");
+    });
+  }
+
+  qs("ver").textContent = "v" + APP_VERSION;
+  bindEvents();
+  boot();
+})();
+</script>
+</body>
+</html>
