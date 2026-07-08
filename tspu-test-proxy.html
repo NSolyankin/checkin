@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Тест через прокси</title>
+<style>
+  :root {
+    --bg: #10141c;
+    --card: #1a2130;
+    --line: #2a3448;
+    --text: #e8ecf4;
+    --muted: #8b96ab;
+    --accent: #4da3ff;
+    --ok: #35c26e;
+    --fail: #ff5c5c;
+    --warn: #ffb84d;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 16px;
+    line-height: 1.5;
+    padding: 16px;
+    max-width: 640px;
+    margin: 0 auto;
+  }
+  h1 { font-size: 22px; margin-bottom: 4px; }
+  .sub { color: var(--muted); font-size: 14px; margin-bottom: 20px; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+  .card h2 { font-size: 15px; margin-bottom: 10px; color: var(--accent); }
+  label { display: block; font-size: 13px; color: var(--muted); margin: 10px 0 4px; }
+  input[type="text"], textarea {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    color: var(--text);
+    padding: 10px;
+    font-size: 14px;
+    font-family: ui-monospace, Menlo, monospace;
+  }
+  textarea { resize: vertical; min-height: 64px; }
+  button {
+    display: block;
+    width: 100%;
+    padding: 14px;
+    margin-top: 12px;
+    border: none;
+    border-radius: 10px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    background: var(--accent);
+    color: #071019;
+  }
+  button.secondary { background: var(--line); color: var(--text); }
+  button:disabled { opacity: 0.5; }
+  .test-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--line);
+    gap: 10px;
+  }
+  .test-row:last-child { border-bottom: none; }
+  .test-name { font-size: 14px; }
+  .test-name small { display: block; color: var(--muted); font-size: 12px; }
+  .badge {
+    font-size: 13px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+  .badge.idle { background: var(--line); color: var(--muted); }
+  .badge.run { background: var(--warn); color: #241a00; }
+  .badge.ok { background: var(--ok); color: #04220f; }
+  .badge.fail { background: var(--fail); color: #2b0505; }
+  #log {
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: 12px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: var(--muted);
+    max-height: 260px;
+    overflow-y: auto;
+  }
+  .verdict { font-size: 15px; font-weight: 600; margin-top: 10px; display: none; }
+  .verdict.ok { color: var(--ok); display: block; }
+  .verdict.fail { color: var(--fail); display: block; }
+  .verdict.warn { color: var(--warn); display: block; }
+  .hint { font-size: 13px; color: var(--muted); margin-top: 8px; }
+</style>
+</head>
+<body>
+
+<h1>Тест через прокси (без VPN)</h1>
+<p class="sub">Три теста через прокси checkin-proxy. Должны пройти без VPN. Версия 2.0</p>
+
+<div class="card">
+  <h2>1. Настройки проекта</h2>
+  <label for="sbUrl">Project URL (вида https://xxxx.supabase.co)</label>
+  <input type="text" id="sbUrl" placeholder="https://xxxx.supabase.co" autocapitalize="off" autocorrect="off">
+  <label for="sbKey">Anon (public) key</label>
+  <textarea id="sbKey" placeholder="eyJhbGciOi..." autocapitalize="off" autocorrect="off"></textarea>
+  <button class="secondary" id="btnSave">Сохранить настройки на этом устройстве</button>
+  <p class="hint">Настройки хранятся только в localStorage этого браузера.</p>
+</div>
+
+<div class="card">
+  <h2>2. Перед запуском</h2>
+  <p class="hint">
+    Отключите VPN. Проверьте с мобильного интернета (Wi-Fi выключить),
+    именно так будут работать телефоны встречающих на турнире.
+    Каждый тест ждет ответ не более 15 секунд.
+  </p>
+</div>
+
+<div class="card">
+  <h2>3. Тесты</h2>
+  <div class="test-row">
+    <div class="test-name">GET / REST<small>Чтение таблицы tspu_test</small></div>
+    <span class="badge idle" id="badge-get">ожидание</span>
+  </div>
+  <div class="test-row">
+    <div class="test-name">POST / REST<small>Запись строки в tspu_test</small></div>
+    <span class="badge idle" id="badge-post">ожидание</span>
+  </div>
+  <div class="test-row">
+    <div class="test-name">POST / Auth<small>Запрос к /auth/v1/token (главный тест)</small></div>
+    <span class="badge idle" id="badge-auth">ожидание</span>
+  </div>
+  <button id="btnRun">Запустить все тесты</button>
+  <p class="verdict" id="verdict"></p>
+</div>
+
+<div class="card">
+  <h2>4. Журнал</h2>
+  <div id="log">Журнал пуст. Заполните настройки и запустите тесты.</div>
+  <button class="secondary" id="btnCopy">Скопировать журнал</button>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var LS_URL = "tspu_test_url";
+  var LS_KEY = "tspu_test_key";
+  var TIMEOUT_MS = 15000;
+
+  var elUrl = document.getElementById("sbUrl");
+  var elKey = document.getElementById("sbKey");
+  var elLog = document.getElementById("log");
+  var elVerdict = document.getElementById("verdict");
+  var btnRun = document.getElementById("btnRun");
+
+  var logLines = [];
+
+  function now() {
+    var d = new Date();
+    function p(n) { return (n < 10 ? "0" : "") + n; }
+    return p(d.getHours()) + ":" + p(d.getMinutes()) + ":" + p(d.getSeconds());
+  }
+
+  function log(msg) {
+    logLines.push("[" + now() + "] " + msg);
+    elLog.textContent = logLines.join("\n");
+    elLog.scrollTop = elLog.scrollHeight;
+  }
+
+  function setBadge(id, state, text) {
+    var b = document.getElementById("badge-" + id);
+    b.className = "badge " + state;
+    b.textContent = text;
+  }
+
+  var DEFAULT_PROXY_URL = "https://checkin-proxy.nsolyankin.deno.net";
+
+  function loadSettings() {
+    try {
+      elUrl.value = localStorage.getItem(LS_URL) || DEFAULT_PROXY_URL;
+      elKey.value = localStorage.getItem(LS_KEY) || "";
+    } catch (e) {
+      elUrl.value = DEFAULT_PROXY_URL;
+    }
+  }
+
+  document.getElementById("btnSave").addEventListener("click", function () {
+    try {
+      localStorage.setItem(LS_URL, elUrl.value.trim());
+      localStorage.setItem(LS_KEY, elKey.value.trim());
+      log("Настройки сохранены.");
+    } catch (e) {
+      log("Не удалось сохранить настройки: " + e.message);
+    }
+  });
+
+  function fetchWithTimeout(url, options) {
+    var controller = new AbortController();
+    var timer = setTimeout(function () { controller.abort(); }, TIMEOUT_MS);
+    options = options || {};
+    options.signal = controller.signal;
+    var started = Date.now();
+    return fetch(url, options).then(function (resp) {
+      clearTimeout(timer);
+      return { resp: resp, ms: Date.now() - started, timedOut: false };
+    }).catch(function (err) {
+      clearTimeout(timer);
+      var timedOut = err && err.name === "AbortError";
+      return { error: err, ms: Date.now() - started, timedOut: timedOut };
+    });
+  }
+
+  function baseUrl() {
+    return elUrl.value.trim().replace(/\/+$/, "");
+  }
+
+  function anonKey() {
+    return elKey.value.trim();
+  }
+
+  // Тест 1: GET чтение таблицы через REST
+  function testGet() {
+    setBadge("get", "run", "идет...");
+    log("GET REST: запрос списка строк tspu_test...");
+    var url = baseUrl() + "/rest/v1/tspu_test?select=id,created_at,note&limit=3";
+    return fetchWithTimeout(url, {
+      method: "GET",
+      headers: {
+        "apikey": anonKey(),
+        "Authorization": "Bearer " + anonKey()
+      }
+    }).then(function (r) {
+      if (r.resp && r.resp.ok) {
+        setBadge("get", "ok", "прошел " + r.ms + " мс");
+        log("GET REST: успех, HTTP " + r.resp.status + ", " + r.ms + " мс.");
+        return true;
+      }
+      if (r.resp) {
+        setBadge("get", "fail", "HTTP " + r.resp.status);
+        log("GET REST: сервер ответил HTTP " + r.resp.status + " за " + r.ms + " мс. Запрос дошел, но отклонен (проверьте ключ, таблицу и политики RLS).");
+        return false;
+      }
+      if (r.timedOut) {
+        setBadge("get", "fail", "таймаут");
+        log("GET REST: таймаут " + TIMEOUT_MS + " мс. Похоже на блокировку ТСПУ (соединение уходит в никуда).");
+      } else {
+        setBadge("get", "fail", "ошибка сети");
+        log("GET REST: сетевая ошибка за " + r.ms + " мс: " + (r.error && r.error.message ? r.error.message : "неизвестно") + ". Возможна блокировка или неверный URL.");
+      }
+      return false;
+    });
+  }
+
+  // Тест 2: POST запись через REST
+  function testPost() {
+    setBadge("post", "run", "идет...");
+    log("POST REST: запись строки в tspu_test...");
+    var url = baseUrl() + "/rest/v1/tspu_test";
+    var note = "test " + new Date().toISOString() + " ua:" + (navigator.userAgent || "").slice(0, 40);
+    return fetchWithTimeout(url, {
+      method: "POST",
+      headers: {
+        "apikey": anonKey(),
+        "Authorization": "Bearer " + anonKey(),
+        "Content-Type": "application/json",
+        "Prefer": "return=minimal"
+      },
+      body: JSON.stringify({ note: note })
+    }).then(function (r) {
+      if (r.resp && (r.resp.status === 201 || r.resp.ok)) {
+        setBadge("post", "ok", "прошел " + r.ms + " мс");
+        log("POST REST: успех, HTTP " + r.resp.status + ", " + r.ms + " мс. Строка записана в базу.");
+        return true;
+      }
+      if (r.resp) {
+        setBadge("post", "fail", "HTTP " + r.resp.status);
+        log("POST REST: сервер ответил HTTP " + r.resp.status + " за " + r.ms + " мс. Запрос дошел до Supabase (ТСПУ не мешает), но отклонен. Проверьте политику RLS на INSERT.");
+        return false;
+      }
+      if (r.timedOut) {
+        setBadge("post", "fail", "таймаут");
+        log("POST REST: таймаут " + TIMEOUT_MS + " мс. Характерный признак блокировки POST на ТСПУ.");
+      } else {
+        setBadge("post", "fail", "ошибка сети");
+        log("POST REST: сетевая ошибка за " + r.ms + " мс: " + (r.error && r.error.message ? r.error.message : "неизвестно") + ".");
+      }
+      return false;
+    });
+  }
+
+  // Тест 3: POST к Auth endpoint (именно он блокировался на портале).
+  // Отправляем заведомо неверные данные: ответ HTTP 400 означает,
+  // что запрос ДОШЕЛ до Supabase, значит блокировки нет.
+  function testAuth() {
+    setBadge("auth", "run", "идет...");
+    log("POST Auth: запрос к /auth/v1/token с заведомо неверным паролем...");
+    var url = baseUrl() + "/auth/v1/token?grant_type=password";
+    return fetchWithTimeout(url, {
+      method: "POST",
+      headers: {
+        "apikey": anonKey(),
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ email: "tspu-probe@example.com", password: "probe-invalid" })
+    }).then(function (r) {
+      if (r.resp) {
+        // Любой HTTP-ответ (200, 400, 401 и т.д.) означает, что запрос прошел через сеть.
+        setBadge("auth", "ok", "прошел " + r.ms + " мс");
+        log("POST Auth: получен HTTP " + r.resp.status + " за " + r.ms + " мс. Запрос дошел до Supabase, блокировки нет. (Код 400 здесь ожидаем: пароль специально неверный.)");
+        return true;
+      }
+      if (r.timedOut) {
+        setBadge("auth", "fail", "таймаут");
+        log("POST Auth: таймаут " + TIMEOUT_MS + " мс. Именно так выглядела блокировка логина на портале. ТСПУ режет POST к auth.");
+      } else {
+        setBadge("auth", "fail", "ошибка сети");
+        log("POST Auth: сетевая ошибка за " + r.ms + " мс: " + (r.error && r.error.message ? r.error.message : "неизвестно") + ".");
+      }
+      return false;
+    });
+  }
+
+  function runAll() {
+    if (!baseUrl() || !anonKey()) {
+      log("Заполните Project URL и anon key перед запуском.");
+      return;
+    }
+    btnRun.disabled = true;
+    elVerdict.className = "verdict";
+    logLines = [];
+    log("Старт тестов. URL: " + baseUrl());
+    log("UserAgent: " + navigator.userAgent);
+    if (navigator.onLine === false) {
+      log("Внимание: браузер сообщает, что сети нет (navigator.onLine = false).");
+    }
+
+    var results = {};
+    testGet().then(function (ok) {
+      results.get = ok;
+      return testPost();
+    }).then(function (ok) {
+      results.post = ok;
+      return testAuth();
+    }).then(function (ok) {
+      results.auth = ok;
+      btnRun.disabled = false;
+      if (results.get && results.post && results.auth) {
+        elVerdict.className = "verdict ok";
+        elVerdict.textContent = "Все тесты прошли. Supabase доступен без VPN, можно делать систему регистрации.";
+        log("ИТОГ: все три теста прошли успешно.");
+      } else if (results.get && !results.post) {
+        elVerdict.className = "verdict fail";
+        elVerdict.textContent = "Чтение работает, запись блокируется. Та же картина, что на портале: без VPN отметить приход не получится.";
+        log("ИТОГ: GET проходит, POST блокируется. Признак ТСПУ.");
+      } else if (!results.get) {
+        elVerdict.className = "verdict warn";
+        elVerdict.textContent = "Не прошел даже GET. Проверьте URL, ключ и настройки таблицы, либо домен блокируется целиком.";
+        log("ИТОГ: GET не прошел. Сначала проверьте настройки проекта.");
+      } else {
+        elVerdict.className = "verdict warn";
+        elVerdict.textContent = "Результаты смешанные, смотрите журнал.";
+        log("ИТОГ: смешанные результаты, детали выше.");
+      }
+      log("Готово. Скопируйте журнал и пришлите его в чат для анализа.");
+    });
+  }
+
+  btnRun.addEventListener("click", runAll);
+
+  document.getElementById("btnCopy").addEventListener("click", function () {
+    var text = logLines.join("\n") || "Журнал пуст.";
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () {
+        log("Журнал скопирован в буфер обмена.");
+      }).catch(function () {
+        log("Не удалось скопировать автоматически. Выделите текст вручную.");
+      });
+    } else {
+      log("Буфер обмена недоступен. Выделите текст вручную.");
+    }
+  });
+
+  loadSettings();
+})();
+</script>
+
+</body>
+</html>
