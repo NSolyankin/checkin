@@ -150,6 +150,22 @@
     font-size: 14px;
     line-height: 1.4;
   }
+  .help-card h3 { font-size: 16px; margin-bottom: 8px; }
+  .help-card p { font-size: 14px; line-height: 1.55; color: #3a3a3c; margin-bottom: 8px; }
+  .help-card ul { padding-left: 20px; margin-bottom: 8px; }
+  .help-card li { font-size: 14px; line-height: 1.55; color: #3a3a3c; margin-bottom: 5px; }
+  .help-card .tag {
+    display: inline-block;
+    border-radius: 7px;
+    padding: 2px 8px;
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .tag.ok { background: #d7f5dd; color: #1d7a35; }
+  .tag.dup { background: #fff3d6; color: #8a6400; }
+  .tag.bad { background: #fde1e1; color: #b22525; }
+  .tag.queued { background: #e8f0fe; color: #2a63c8; }
+
   .stage-note {
     background: #fff6db;
     border-radius: 10px;
@@ -267,6 +283,33 @@
   .check-row { display: flex; align-items: center; gap: 8px; font-size: 14px; }
   .check-row input { width: 20px; height: 20px; }
 
+  #print-area { display: none; }
+  @media print {
+    body { background: #ffffff; }
+    #app, .overlay, #toast { display: none !important; }
+    #print-area { display: block !important; }
+  }
+  #print-area .pr-head {
+    text-align: center;
+    font-size: 12pt;
+    margin-bottom: 5mm;
+    font-weight: 700;
+  }
+  .pr-card {
+    display: inline-block;
+    vertical-align: top;
+    width: 44%;
+    margin: 1.5%;
+    padding: 4mm;
+    border: 1px dashed #9a9a9a;
+    border-radius: 3mm;
+    text-align: center;
+    page-break-inside: avoid;
+  }
+  .pr-card img { width: 40mm; height: 40mm; }
+  .pr-name { font-weight: 700; font-size: 13pt; margin-top: 2mm; }
+  .pr-sub { font-size: 10pt; color: #444444; }
+
   #toast {
     position: fixed;
     left: 50%;
@@ -309,6 +352,7 @@
       <button class="btn secondary" id="btn-mode-scan">Режим сканера</button>
     </div>
     <div class="hint">Гости заходят по персональной ссылке из приглашения, код им не нужен.</div>
+    <button class="btn secondary" id="btn-help-start">Инструкция</button>
   </div>
 
   <div class="screen" id="screen-code">
@@ -327,8 +371,11 @@
     <div class="org-toolbar">
       <button class="btn primary" id="btn-add-guest">Добавить гостя</button>
       <button class="btn secondary" id="btn-import">Импорт из таблицы</button>
+      <button class="btn secondary" id="btn-send">Рассылка приглашений</button>
       <button class="btn secondary" id="btn-codes">Коды доступа</button>
       <button class="btn secondary" id="btn-refresh">Обновить список</button>
+      <button class="btn secondary" id="btn-export">Экспорт JSON</button>
+      <button class="btn secondary" id="btn-help-org">Инструкция</button>
     </div>
     <input type="text" id="org-search" placeholder="Поиск: имя, псевдоним, категория" autocomplete="off">
     <div class="chips" id="chips-status">
@@ -355,7 +402,65 @@
     </div>
     <div id="scan-result"></div>
     <div class="status wait" id="queue-info" style="display:none;"></div>
+    <button class="btn secondary" id="btn-help-scan">Инструкция</button>
     <button class="btn warn" id="btn-scan-exit">Выйти</button>
+  </div>
+
+  <div class="screen" id="screen-help">
+    <button class="btn secondary" id="btn-help-back-top">Назад</button>
+
+    <div class="card help-card">
+      <h3>Что это за приложение</h3>
+      <p>Система регистрации гостей мероприятия по QR-кодам. У каждого гостя есть персональная ссылка и QR-код. На входе встречающий сканирует код камерой телефона, и гость мгновенно отмечается как пришедший. Организатор видит живую картину прихода на своем экране.</p>
+      <p>Три режима работы: организатор (управляет списком), встречающий (сканирует на входе), гость (показывает свой QR).</p>
+    </div>
+
+    <div class="card help-card">
+      <h3>Организатору</h3>
+      <ul>
+        <li><b>Добавить гостя</b> - ручное добавление одного человека. Обязательно только имя и фамилия, остальное по желанию.</li>
+        <li><b>Импорт из таблицы</b> - массовая загрузка: вставьте скопированные строки из Excel или Гугл-таблицы, либо загрузите файл CSV (например, выгрузку ответов гугл-формы). Колонки сопоставляются с полями сами по заголовкам, включая поля анкеты: группа, роль (категория), дети, возраст детей, детская комната, after party, контакт. Проверьте угаданное в предпросмотре и поправьте, если нужно. Повторный импорт того же списка безопасен: дубли по имени пропускаются.</li>
+        <li><b>QR и ссылка</b> (кнопка у каждого гостя) - здесь берется персональный QR для рассылки: скачайте картинку PNG или скопируйте ссылку и отправьте гостю.</li>
+        <li><b>Отметить приход / Снять отметку</b> - ручная отметка, если гость пришел без телефона и без распечатки.</li>
+        <li><b>Карточка гостя</b> показывает данные анкеты серой строкой: группа, дети и их возраст, детская комната, after party, а также комментарий.</li>
+        <li><b>Счетчики</b> наверху: сколько пришло из скольких, разбивка по категориям, отдельно "С детьми" и "After party" - готовые цифры для детской комнаты и афтепати.</li>
+        <li><b>Поиск и фильтры</b>: поиск понимает имя, псевдоним, категорию и группу (наберите "161" - увидите всю группу). Чипы "Пришли / Не пришли" и выбор категории сужают список.</li>
+        <li><b>Коды доступа</b> - смена кода организатора и кода встречающего. Новые коды действуют сразу.</li>
+        <li><b>Рассылка приглашений</b> - массовые варианты: печатный лист со всеми QR (разрезать на бейджи или раздать на входе) и таблица CSV со ссылками для рассылки по почте или в мессенджерах. Есть фильтр по категории.</li>
+        <li><b>Экспорт JSON</b> - скачать весь список с отметками одним файлом, архив мероприятия.</li>
+        <li>Список обновляется сам каждые 10 секунд, время последнего обновления видно под счетчиком.</li>
+      </ul>
+    </div>
+
+    <div class="card help-card">
+      <h3>Встречающему</h3>
+      <p>Откройте приложение, выберите "Режим сканера", введите код (его сообщает организатор). Впишите свою метку, например "Вход-1" - она будет видна организатору рядом с каждой вашей отметкой. Нажмите "Включить камеру" и разрешите браузеру доступ к камере.</p>
+      <p>Наводите камеру на QR-код гостя (на экране его телефона или на распечатке). Значения карточек:</p>
+      <ul>
+        <li><span class="tag ok">Зеленая</span> - приход отмечен, все хорошо, пропускайте.</li>
+        <li><span class="tag dup">Оранжевая</span> - этот гость уже отмечен ранее (время указано). Пропускайте, повторная отметка не ставится.</li>
+        <li><span class="tag bad">Красная</span> - код не найден или это посторонний QR. Отправьте гостя к организатору.</li>
+        <li><span class="tag queued">Синяя</span> - интернет пропал, отметка сохранена на телефоне и уйдет сама, когда связь появится. Гостя пропускайте, ничего делать не нужно.</li>
+      </ul>
+      <p>Наверху экрана индикатор связи. Даже если он красный, продолжайте сканировать: все отметки копятся в очереди и отправятся автоматически.</p>
+    </div>
+
+    <div class="card help-card">
+      <h3>Гостю</h3>
+      <p>Откройте персональную ссылку из приглашения - на экране появится ваш QR-код. Покажите его встречающему на входе. Если ссылка потерялась, назовите встречающему или организатору свое имя: вас отметят вручную.</p>
+    </div>
+
+    <div class="card help-card">
+      <h3>Частые вопросы</h3>
+      <ul>
+        <li><b>Камера не включается.</b> Проверьте, что вы разрешили сайту доступ к камере (значок в адресной строке браузера). На айфоне откройте ссылку в Safari.</li>
+        <li><b>Несколько встречающих одновременно.</b> Работайте спокойно с любого числа телефонов: каждый гость будет учтен ровно один раз, при пересечении второй сканер увидит оранжевую карточку.</li>
+        <li><b>Гость пришел без телефона.</b> Организатор находит его по имени через поиск и нажимает "Отметить приход". Либо заранее распечатайте QR-коды на бумаге.</li>
+        <li><b>Пропал интернет у организатора.</b> Список перестанет обновляться, но сканеры продолжат работать. После восстановления связи все появится.</li>
+      </ul>
+    </div>
+
+    <button class="btn secondary" id="btn-help-back">Назад</button>
   </div>
 
   <div class="screen" id="screen-guest">
@@ -393,6 +498,26 @@
     <div>
       <div class="field-label">Электронная почта</div>
       <input type="text" id="gm-email" autocomplete="off" inputmode="email">
+    </div>
+    <div>
+      <div class="field-label">Группа / кого представляет</div>
+      <input type="text" id="gm-group" autocomplete="off" placeholder="161 группа, наставник...">
+    </div>
+    <div>
+      <div class="field-label">Дети (да/нет)</div>
+      <input type="text" id="gm-kids" autocomplete="off">
+    </div>
+    <div>
+      <div class="field-label">Возраст детей</div>
+      <input type="text" id="gm-kidsage" autocomplete="off">
+    </div>
+    <div>
+      <div class="field-label">Детская комната / аниматор</div>
+      <input type="text" id="gm-kidsroom" autocomplete="off">
+    </div>
+    <div>
+      <div class="field-label">After party</div>
+      <input type="text" id="gm-party" autocomplete="off">
     </div>
     <div>
       <div class="field-label">Категория</div>
@@ -442,7 +567,12 @@
         <span>Игровое имя</span><select id="map-game"></select>
         <span>Телефон</span><select id="map-phone"></select>
         <span>Почта</span><select id="map-email"></select>
-        <span>Категория</span><select id="map-cat"></select>
+        <span>Категория (роль)</span><select id="map-cat"></select>
+        <span>Группа / представляет</span><select id="map-group"></select>
+        <span>Дети (да/нет)</span><select id="map-kids"></select>
+        <span>Возраст детей</span><select id="map-kidsage"></select>
+        <span>Детская комната</span><select id="map-kidsroom"></select>
+        <span>After party</span><select id="map-party"></select>
         <span>Комментарий</span><select id="map-comment"></select>
       </div>
       <div>
@@ -506,6 +636,26 @@
   </div>
 </div>
 
+<div id="print-area"></div>
+
+<!-- ==== Окно: массовая рассылка ==== -->
+<div class="overlay" id="ov-send">
+  <div class="modal">
+    <h2>Массовая рассылка приглашений</h2>
+    <div>
+      <div class="field-label">Кому</div>
+      <select id="send-cat"></select>
+    </div>
+    <div class="hint" style="text-align:left;">
+      Печатный лист: карточки с QR для раздачи или разрезания на бейджи. Печатайте с компьютера.<br>
+      Таблица CSV: имя, контакты и персональная ссылка каждого гостя - для рассылки по почте или в мессенджерах.
+    </div>
+    <button class="btn primary" id="send-print">Печатный лист QR</button>
+    <button class="btn secondary" id="send-csv">Скачать таблицу ссылок (CSV)</button>
+    <button class="btn secondary" id="send-cancel">Отмена</button>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <script>
@@ -525,7 +675,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   /* ==== Настройки подключения ==== */
   var PROXY_BASE = "https://checkin-proxy.nsolyankin.deno.net";
   var SUPABASE_KEY = "sb_publishable_un-yRBahx6hB0t6NQGjc-A_8GTPV1ZO";
-  var APP_VERSION = "0.4 (этап 7)";
+  var APP_VERSION = "0.9";
 
   /* ==== Состояние ==== */
   var settings = null;
@@ -747,15 +897,34 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   }
 
   /* ==== Панель организатора ==== */
+  var orgTimer = null;
+  var lastOrgUpdate = null;
+
+  function pollOrg() {
+    if (document.hidden) { return; }
+    if (!qs("screen-org").classList.contains("active")) { return; }
+    loadGuests().then(function () {
+      lastOrgUpdate = new Date();
+      renderOrg();
+    }).catch(function () { /* тихий опрос, следующая попытка через 10 секунд */ });
+  }
+
   function enterOrg() {
     showScreen("screen-org");
     qs("guest-list").innerHTML = "<div class='empty-note'>Загрузка списка...</div>";
     loadGuests().then(function () {
+      lastOrgUpdate = new Date();
       renderOrg();
     }).catch(function (err) {
       qs("guest-list").innerHTML =
         "<div class='empty-note'>Не удалось загрузить список: " + esc(err.message) + "</div>";
     });
+    if (orgTimer) { clearInterval(orgTimer); }
+    orgTimer = setInterval(pollOrg, 10000);
+  }
+
+  function leaveOrg() {
+    if (orgTimer) { clearInterval(orgTimer); orgTimer = null; }
   }
 
   function allCategories() {
@@ -792,6 +961,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     var total = guests.length;
     var arrived = 0;
     var byCat = {};
+    var withKids = 0;
+    var party = 0;
     var i, g;
     for (i = 0; i < guests.length; i++) {
       g = guests[i];
@@ -799,6 +970,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (!byCat[c]) { byCat[c] = { total: 0, arrived: 0 }; }
       byCat[c].total++;
       if (g.status === "пришел") { arrived++; byCat[c].arrived++; }
+      if (/^да/i.test((g.kids || "").trim())) { withKids++; }
+      if (/^да/i.test((g.after_party || "").trim())) { party++; }
     }
     var html = "<div class='big'>Пришло " + arrived + " из " + total + "</div>";
     var parts = [];
@@ -809,6 +982,17 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       }
     }
     html += "<div class='by-cat'>" + (parts.length ? parts.join(" &middot; ") : "Список пуст") + "</div>";
+    if (withKids > 0 || party > 0) {
+      html += "<div class='by-cat'>С детьми: " + withKids + " &middot; After party: " + party + "</div>";
+    }
+    if (lastOrgUpdate) {
+      var hh = lastOrgUpdate.getHours();
+      var mm = lastOrgUpdate.getMinutes();
+      var ss = lastOrgUpdate.getSeconds();
+      html += "<div class='by-cat'>Список обновляется сам. Последнее обновление: " +
+        (hh < 10 ? "0" : "") + hh + ":" + (mm < 10 ? "0" : "") + mm + ":" +
+        (ss < 10 ? "0" : "") + ss + "</div>";
+    }
     qs("org-counters").innerHTML = html;
   }
 
@@ -818,7 +1002,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     if (filterCat !== "all" && (g.category || "") !== filterCat) { return false; }
     if (searchStr) {
       var hay = ((g.first_last_name || "") + " " + (g.game_name || "") + " " +
-        (g.category || "")).toLowerCase();
+        (g.category || "") + " " + (g.group_name || "")).toLowerCase();
       if (hay.indexOf(searchStr) === -1) { return false; }
     }
     return true;
@@ -844,6 +1028,16 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         "</div><span class='g-cat'>" + esc(g.category || "-") + "</span></div>" +
         "<div class='g-state " + (arrived ? "arrived" : "invited") + "'>" + stText + "</div>" +
         (g.comment ? "<div class='g-comment'>" + esc(g.comment) + "</div>" : "") +
+        (function () {
+          var det = [];
+          if (g.group_name) { det.push(g.group_name); }
+          if (g.kids) {
+            det.push("Дети: " + g.kids + (g.kids_age ? " (" + g.kids_age + ")" : ""));
+          }
+          if (g.kids_room) { det.push("Детская комната: " + g.kids_room); }
+          if (g.after_party) { det.push("After party: " + g.after_party); }
+          return det.length ? "<div class='g-comment'>" + esc(det.join(" * ")) + "</div>" : "";
+        })() +
         "<div class='g-actions'>" +
         (arrived
           ? "<button class='btn small secondary' data-act='unmark' data-id='" + g.id + "'>Снять отметку</button>"
@@ -935,6 +1129,11 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     qs("gm-phone").value = g ? (g.phone || "") : "";
     qs("gm-email").value = g ? (g.email || "") : "";
     qs("gm-comment").value = g ? (g.comment || "") : "";
+    qs("gm-group").value = g ? (g.group_name || "") : "";
+    qs("gm-kids").value = g ? (g.kids || "") : "";
+    qs("gm-kidsage").value = g ? (g.kids_age || "") : "";
+    qs("gm-kidsroom").value = g ? (g.kids_room || "") : "";
+    qs("gm-party").value = g ? (g.after_party || "") : "";
     fillCatSelect(qs("gm-cat"), g ? g.category : null);
     qs("gm-cat-new").style.display = "none";
     qs("gm-cat-new").value = "";
@@ -974,7 +1173,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       phone: qs("gm-phone").value.trim() || null,
       email: qs("gm-email").value.trim() || null,
       category: cat,
-      comment: qs("gm-comment").value.trim() || null
+      comment: qs("gm-comment").value.trim() || null,
+      group_name: qs("gm-group").value.trim() || null,
+      kids: qs("gm-kids").value.trim() || null,
+      kids_age: qs("gm-kidsage").value.trim() || null,
+      kids_room: qs("gm-kidsroom").value.trim() || null,
+      after_party: qs("gm-party").value.trim() || null
     };
     qs("gm-save").disabled = true;
     ensureCategorySaved(cat).then(function () {
@@ -1040,6 +1244,117 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }).then(function () {
       qs("cd-save").disabled = false;
     });
+  }
+
+  /* ==== Экспорт JSON ==== */
+  function exportJson() {
+    var payload = {
+      exported_at: new Date().toISOString(),
+      app_version: APP_VERSION,
+      total: guests.length,
+      arrived: guests.filter(function (g) { return g.status === "пришел"; }).length,
+      categories: settings.categories,
+      guests: guests
+    };
+    var text = JSON.stringify(payload, null, 2);
+    var d = new Date();
+    var fname = "checkin-" + d.getFullYear() + "-" +
+      (d.getMonth() < 9 ? "0" : "") + (d.getMonth() + 1) + "-" +
+      (d.getDate() < 10 ? "0" : "") + d.getDate() + ".json";
+    var a = document.createElement("a");
+    a.download = fname;
+    var blob = new Blob([text], { type: "application/json" });
+    var url = URL.createObjectURL(blob);
+    a.href = url;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 10000);
+    toast("Экспортировано гостей: " + guests.length);
+  }
+
+  /* ==== Массовая рассылка ==== */
+  function openSendModal() {
+    var sel = qs("send-cat");
+    var cats = allCategories();
+    var html = "<option value='all'>Все гости (" + guests.length + ")</option>";
+    var i;
+    for (i = 0; i < cats.length; i++) {
+      var n = guests.filter(function (g) { return (g.category || "") === cats[i]; }).length;
+      html += "<option value='" + esc(cats[i]) + "'>" + esc(cats[i]) + " (" + n + ")</option>";
+    }
+    sel.innerHTML = html;
+    openOv("ov-send");
+  }
+
+  function sendFilterGuests() {
+    var cat = qs("send-cat").value;
+    return guests.filter(function (g) {
+      return cat === "all" || (g.category || "") === cat;
+    });
+  }
+
+  function buildPrintSheet() {
+    var list = sendFilterGuests();
+    if (!list.length) { toast("Нет гостей для печати"); return; }
+    var tmp = document.createElement("canvas");
+    var html = "<div class='pr-head'>QR-коды приглашений (" + list.length + " шт.)</div>";
+    var i, g, sub;
+    for (i = 0; i < list.length; i++) {
+      g = list[i];
+      try {
+        drawQr(tmp, personalLink(g.token), 400);
+      } catch (e) { continue; }
+      sub = (g.game_name ? g.game_name + " * " : "") + (g.category || "");
+      html += "<div class='pr-card'><img src='" + tmp.toDataURL("image/png") +
+        "' alt=''><div class='pr-name'>" + esc(g.first_last_name) +
+        "</div><div class='pr-sub'>" + esc(sub) + "</div></div>";
+    }
+    qs("print-area").innerHTML = html;
+    closeOv("ov-send");
+    setTimeout(function () { window.print(); }, 300);
+  }
+
+  function csvEscape(v) {
+    if (v === null || v === undefined) { v = ""; }
+    v = String(v);
+    if (/[";\n\r]/.test(v)) {
+      v = "\"" + v.replace(/"/g, "\"\"") + "\"";
+    }
+    return v;
+  }
+
+  function buildCsv() {
+    var list = sendFilterGuests();
+    if (!list.length) { toast("Нет гостей для выгрузки"); return; }
+    var rows = ["Имя и фамилия;Игровое имя;Категория;Телефон;Почта;Персональная ссылка"];
+    var i, g;
+    for (i = 0; i < list.length; i++) {
+      g = list[i];
+      rows.push([
+        csvEscape(g.first_last_name),
+        csvEscape(g.game_name),
+        csvEscape(g.category),
+        csvEscape(g.phone),
+        csvEscape(g.email),
+        csvEscape(personalLink(g.token))
+      ].join(";"));
+    }
+    var text = "\uFEFF" + rows.join("\r\n");
+    var d = new Date();
+    var fname = "invite-links-" + d.getFullYear() + "-" +
+      (d.getMonth() < 9 ? "0" : "") + (d.getMonth() + 1) + "-" +
+      (d.getDate() < 10 ? "0" : "") + d.getDate() + ".csv";
+    var a = document.createElement("a");
+    a.download = fname;
+    var blob = new Blob([text], { type: "text/csv;charset=utf-8" });
+    var url = URL.createObjectURL(blob);
+    a.href = url;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 10000);
+    toast("Выгружено ссылок: " + list.length);
   }
 
   /* ==== Импорт ==== */
@@ -1118,7 +1433,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     for (i = 0; i < importRows.length; i++) {
       if (importRows[i].length > nCols) { nCols = importRows[i].length; }
     }
-    var ids = ["map-fio", "map-fio2", "map-game", "map-phone", "map-email", "map-cat", "map-comment"];
+    var ids = ["map-fio", "map-fio2", "map-game", "map-phone", "map-email", "map-cat",
+      "map-group", "map-kids", "map-kidsage", "map-kidsroom", "map-party", "map-comment"];
     for (j = 0; j < ids.length; j++) {
       var html = "<option value='-1'>нет</option>";
       for (i = 0; i < nCols; i++) {
@@ -1169,7 +1485,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     match("map-game", ["игров", "псевдоним", "ник", "nick"]);
     match("map-phone", ["телефон", "phone", "тел."]);
     match("map-email", ["почта", "email", "e-mail", "мейл", "мэйл"]);
-    match("map-cat", ["категор", "роль"]);
+    match("map-cat", ["категор", "какой роли", "роль"]);
+    match("map-group", ["представляете", "группа"]);
+    match("map-kidsage", ["возраст"]);
+    match("map-kidsroom", ["детской комнат", "детская комнат", "аниматор"]);
+    match("map-kids", ["дети"]);
+    match("map-party", ["party", "афте", "афтепати"]);
     match("map-comment", ["комментар", "примечан", "comment", "пожелан"]);
   }
 
@@ -1285,6 +1606,11 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         email: cellOf(row, "map-email") || null,
         category: cellOf(row, "map-cat") || defCat,
         comment: cellOf(row, "map-comment") || null,
+        group_name: cellOf(row, "map-group") || null,
+        kids: cellOf(row, "map-kids") || null,
+        kids_age: cellOf(row, "map-kidsage") || null,
+        kids_room: cellOf(row, "map-kidsroom") || null,
+        after_party: cellOf(row, "map-party") || null,
         status: "приглашен"
       });
     }
@@ -1723,6 +2049,22 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     if (connTimer) { clearInterval(connTimer); connTimer = null; }
   }
 
+  /* ==== Инструкция ==== */
+  var helpBack = "screen-start";
+
+  function openHelp() {
+    var act = document.querySelector(".screen.active");
+    helpBack = act ? act.id : "screen-start";
+    if (camStream) { stopCam(); }
+    showScreen("screen-help");
+    window.scrollTo(0, 0);
+  }
+
+  function closeHelp() {
+    showScreen(helpBack);
+    window.scrollTo(0, 0);
+  }
+
   /* ==== Подтверждение ==== */
   function askConfirm(text, cb) {
     qs("cf-text").textContent = text;
@@ -1812,6 +2154,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       showScreen("screen-start");
     });
     qs("btn-org-exit").addEventListener("click", function () {
+      leaveOrg();
       clearSession();
       showScreen("screen-start");
     });
@@ -1840,6 +2183,16 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     /* панель организатора */
     qs("btn-add-guest").addEventListener("click", function () { openGuestModal(null); });
     qs("btn-import").addEventListener("click", openImportModal);
+    qs("btn-export").addEventListener("click", exportJson);
+    qs("btn-send").addEventListener("click", openSendModal);
+    qs("send-print").addEventListener("click", buildPrintSheet);
+    qs("send-csv").addEventListener("click", buildCsv);
+    qs("send-cancel").addEventListener("click", function () { closeOv("ov-send"); });
+    qs("btn-help-start").addEventListener("click", openHelp);
+    qs("btn-help-org").addEventListener("click", openHelp);
+    qs("btn-help-scan").addEventListener("click", openHelp);
+    qs("btn-help-back").addEventListener("click", closeHelp);
+    qs("btn-help-back-top").addEventListener("click", closeHelp);
     qs("btn-codes").addEventListener("click", openCodesModal);
     qs("btn-refresh").addEventListener("click", function () {
       loadGuests().then(renderOrg).then(function () { toast("Список обновлен"); })
