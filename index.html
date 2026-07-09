@@ -477,7 +477,7 @@
         <li><span class="tag bad">Красная</span> - код не найден или это посторонний QR. Отправьте гостя к организатору.</li>
         <li><span class="tag queued">Синяя</span> - интернет пропал, отметка сохранена на телефоне и уйдет сама, когда связь появится. Гостя пропускайте, ничего делать не нужно.</li>
       </ul>
-      <p>Результат сканирования показывается крупной цветной вспышкой прямо поверх окна камеры: зеленая с галочкой - проходите, оранжевая - уже отмечен, красная - код не найден, синяя - сохранено без связи. На айфоне с включенным беззвучным режимом звукового сигнала не будет - ориентируйтесь на вспышку.</p>
+      <p>Результат сканирования показывается крупной цветной вспышкой прямо поверх окна камеры: зеленая с галочкой - проходите, оранжевая - уже отмечен, красная - код не найден, синяя - сохранено без связи. Звук сигналов идет по медийному каналу (как видео в браузере) и обычно слышен даже при беззвучном переключателе айфона; громкость меняется боковыми кнопками при открытом сканере. Если звука все равно нет - проверьте громкость мультимедиа и ориентируйтесь на вспышку.</p>
       <p>Наверху экрана индикатор связи. Даже если он красный, продолжайте сканировать: все отметки копятся в очереди и отправятся автоматически.</p>
     </div>
 
@@ -725,7 +725,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   /* ==== Настройки подключения ==== */
   var PROXY_BASE = "https://checkin-proxy.nsolyankin.deno.net";
   var SUPABASE_KEY = "sb_publishable_un-yRBahx6hB0t6NQGjc-A_8GTPV1ZO";
-  var APP_VERSION = "0.9.2";
+  var APP_VERSION = "0.9.3";
 
   /* ==== Состояние ==== */
   var settings = null;
@@ -1890,12 +1890,96 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     } catch (e) { /* не критично */ }
   }
 
-  function beep(kind) {
-    ensureAudio();
+  /* Медийный звук: играет на айфоне даже при беззвучном переключателе */
+  var snd = {};
+  var sndReady = false;
+
+  function synthWav(parts) {
+    var sr = 22050;
+    var total = 0;
+    var i, j;
+    for (i = 0; i < parts.length; i++) { total += Math.round(parts[i][1] * sr); }
+    var data = new Int16Array(total);
+    var pos = 0;
+    for (i = 0; i < parts.length; i++) {
+      var freq = parts[i][0];
+      var n = Math.round(parts[i][1] * sr);
+      var fade = Math.min(Math.round(0.008 * sr), Math.floor(n / 2));
+      for (j = 0; j < n; j++) {
+        var amp = freq === 0 ? 0 : 0.85;
+        if (j < fade) { amp = amp * j / fade; }
+        if (j > n - fade) { amp = amp * (n - j) / fade; }
+        data[pos + j] = Math.round(Math.sin(2 * Math.PI * freq * j / sr) * amp * 32767);
+      }
+      pos += n;
+    }
+    var bytes = new Uint8Array(44 + data.length * 2);
+    var dv = new DataView(bytes.buffer);
+    function wstr(off, str) {
+      var k;
+      for (k = 0; k < str.length; k++) { bytes[off + k] = str.charCodeAt(k); }
+    }
+    wstr(0, "RIFF"); dv.setUint32(4, 36 + data.length * 2, true); wstr(8, "WAVE");
+    wstr(12, "fmt "); dv.setUint32(16, 16, true); dv.setUint16(20, 1, true);
+    dv.setUint16(22, 1, true); dv.setUint32(24, sr, true); dv.setUint32(28, sr * 2, true);
+    dv.setUint16(32, 2, true); dv.setUint16(34, 16, true);
+    wstr(36, "data"); dv.setUint32(40, data.length * 2, true);
+    new Uint8Array(bytes.buffer, 44).set(new Uint8Array(data.buffer));
+    var bin = "";
+    var CH = 8192;
+    for (i = 0; i < bytes.length; i += CH) {
+      bin += String.fromCharCode.apply(null, bytes.subarray(i, Math.min(i + CH, bytes.length)));
+    }
+    var a = new Audio("data:audio/wav;base64," + btoa(bin));
+    a.preload = "auto";
+    return a;
+  }
+
+  function initSounds() {
+    if (sndReady) { return; }
+    try {
+      snd.ok = synthWav([[880, 0.12], [0, 0.02], [1245, 0.22]]);
+      snd.dup = synthWav([[500, 0.14], [0, 0.09], [500, 0.14]]);
+      snd.bad = synthWav([[250, 0.4]]);
+      snd.queued = synthWav([[660, 0.12], [0, 0.03], [880, 0.16]]);
+      var k;
+      for (k in snd) {
+        if (Object.prototype.hasOwnProperty.call(snd, k)) {
+          (function (a) {
+            /* тихий первый запуск по касанию открывает звук для последующих сигналов */
+            a.muted = true;
+            var pr = a.play();
+            if (pr && pr.then) {
+              pr.then(function () { a.pause(); a.currentTime = 0; a.muted = false; },
+                function () { a.muted = false; });
+            } else { a.muted = false; }
+          })(snd[k]);
+        }
+      }
+      sndReady = true;
+    } catch (e) { sndReady = false; }
+  }
+
+  function toneFallback(kind) {
     if (kind === "ok") { tone(880, 0.15); }
     else if (kind === "dup") { tone(440, 0.12); tone(440, 0.12, 0.18); }
     else if (kind === "bad") { tone(220, 0.3); }
     else { tone(660, 0.12); }
+  }
+
+  function beep(kind) {
+    ensureAudio();
+    var key = (kind === "ok" || kind === "dup" || kind === "bad") ? kind : "queued";
+    var a = sndReady ? snd[key] : null;
+    if (a) {
+      try {
+        a.currentTime = 0;
+        var pr = a.play();
+        if (pr && pr.catch) { pr.catch(function () { toneFallback(kind); }); }
+      } catch (e) { toneFallback(kind); }
+    } else {
+      toneFallback(kind);
+    }
     try {
       if (navigator.vibrate) {
         navigator.vibrate(kind === "ok" ? 80 : [60, 60, 60]);
@@ -2128,6 +2212,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
   function startCam() {
     ensureAudio();
+    initSounds();
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       toast("Камера недоступна в этом браузере");
       return;
