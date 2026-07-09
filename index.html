@@ -404,7 +404,7 @@
       <button class="btn secondary" id="btn-send">Рассылка приглашений</button>
       <button class="btn secondary" id="btn-codes">Коды доступа</button>
       <button class="btn secondary" id="btn-refresh">Обновить список</button>
-      <button class="btn secondary" id="btn-export">Экспорт JSON</button>
+      <button class="btn secondary" id="btn-export">Экспорт</button>
       <button class="btn secondary" id="btn-help-org">Инструкция</button>
     </div>
     <input type="text" id="org-search" placeholder="Поиск: имя, псевдоним, категория" autocomplete="off">
@@ -462,7 +462,7 @@
         <li><b>Поиск и фильтры</b>: поиск понимает имя, псевдоним, категорию и группу (наберите "161" - увидите всю группу). Чипы "Пришли / Не пришли" и выбор категории сужают список.</li>
         <li><b>Коды доступа</b> - смена кода организатора и кода встречающего. Новые коды действуют сразу.</li>
         <li><b>Рассылка приглашений</b> - массовые варианты: печатный лист со всеми QR (разрезать на бейджи или раздать на входе) и таблица CSV со ссылками для рассылки по почте или в мессенджерах. Есть фильтр по категории.</li>
-        <li><b>Экспорт JSON</b> - скачать весь список с отметками одним файлом, архив мероприятия.</li>
+        <li><b>Экспорт</b> - полный список для Excel (CSV со всеми полями: контакты, группа, дети, детская комната, after party, статус, время прихода, кто отметил, персональные ссылки) или архив JSON. В Excel к списку удобно применять фильтры и сортировку.</li>
         <li>Список обновляется сам каждые 10 секунд, время последнего обновления видно под счетчиком.</li>
       </ul>
     </div>
@@ -674,6 +674,20 @@
 
 <div id="print-area"></div>
 
+<!-- ==== Окно: экспорт ==== -->
+<div class="overlay" id="ov-export">
+  <div class="modal">
+    <h2>Экспорт списка гостей</h2>
+    <div class="hint" style="text-align:left;">
+      Полный список: таблица для Excel со всеми полями - контакты, группа, дети, детская комната, after party, статус, время прихода, кто отметил, персональная ссылка.<br>
+      Архив JSON: те же данные одним файлом для хранения.
+    </div>
+    <button class="btn primary" id="ex-csv">Полный список для Excel (CSV)</button>
+    <button class="btn secondary" id="ex-json">Архив JSON</button>
+    <button class="btn secondary" id="ex-cancel">Отмена</button>
+  </div>
+</div>
+
 <!-- ==== Окно: массовая рассылка ==== -->
 <div class="overlay" id="ov-send">
   <div class="modal">
@@ -711,7 +725,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   /* ==== Настройки подключения ==== */
   var PROXY_BASE = "https://checkin-proxy.nsolyankin.deno.net";
   var SUPABASE_KEY = "sb_publishable_un-yRBahx6hB0t6NQGjc-A_8GTPV1ZO";
-  var APP_VERSION = "0.9.1";
+  var APP_VERSION = "0.9.2";
 
   /* ==== Состояние ==== */
   var settings = null;
@@ -1282,7 +1296,60 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     });
   }
 
-  /* ==== Экспорт JSON ==== */
+  /* ==== Экспорт ==== */
+  function fmtDateTime(iso) {
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) { return ""; }
+    function two(n) { return (n < 10 ? "0" : "") + n; }
+    return two(d.getDate()) + "." + two(d.getMonth() + 1) + "." + d.getFullYear() +
+      " " + two(d.getHours()) + ":" + two(d.getMinutes());
+  }
+
+  function downloadTextFile(fname, text, mime) {
+    var a = document.createElement("a");
+    a.download = fname;
+    var blob = new Blob([text], { type: mime });
+    var url = URL.createObjectURL(blob);
+    a.href = url;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 10000);
+  }
+
+  function exportFullCsv() {
+    if (!guests.length) { toast("Список пуст"); return; }
+    var rows = ["Имя и фамилия;Игровое имя;Категория;Группа;Телефон;Почта;Дети;Возраст детей;Детская комната;After party;Комментарий;Статус;Пришел в;Кто отметил;Персональная ссылка"];
+    var i, g;
+    for (i = 0; i < guests.length; i++) {
+      g = guests[i];
+      rows.push([
+        csvEscape(g.first_last_name),
+        csvEscape(g.game_name),
+        csvEscape(g.category),
+        csvEscape(g.group_name),
+        csvEscape(g.phone),
+        csvEscape(g.email),
+        csvEscape(g.kids),
+        csvEscape(g.kids_age),
+        csvEscape(g.kids_room),
+        csvEscape(g.after_party),
+        csvEscape(g.comment),
+        csvEscape(g.status),
+        csvEscape(g.arrived_at ? fmtDateTime(g.arrived_at) : ""),
+        csvEscape(g.checked_by),
+        csvEscape(personalLink(g.token))
+      ].join(";"));
+    }
+    var d = new Date();
+    var fname = "spisok-" + d.getFullYear() + "-" +
+      (d.getMonth() < 9 ? "0" : "") + (d.getMonth() + 1) + "-" +
+      (d.getDate() < 10 ? "0" : "") + d.getDate() + ".csv";
+    downloadTextFile(fname, "\uFEFF" + rows.join("\r\n"), "text/csv;charset=utf-8");
+    closeOv("ov-export");
+    toast("Выгружено гостей: " + guests.length);
+  }
+
   function exportJson() {
     var payload = {
       exported_at: new Date().toISOString(),
@@ -1306,6 +1373,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     a.click();
     document.body.removeChild(a);
     setTimeout(function () { URL.revokeObjectURL(url); }, 10000);
+    closeOv("ov-export");
     toast("Экспортировано гостей: " + guests.length);
   }
 
@@ -2255,7 +2323,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     /* панель организатора */
     qs("btn-add-guest").addEventListener("click", function () { openGuestModal(null); });
     qs("btn-import").addEventListener("click", openImportModal);
-    qs("btn-export").addEventListener("click", exportJson);
+    qs("btn-export").addEventListener("click", function () { openOv("ov-export"); });
+    qs("ex-csv").addEventListener("click", exportFullCsv);
+    qs("ex-json").addEventListener("click", exportJson);
+    qs("ex-cancel").addEventListener("click", function () { closeOv("ov-export"); });
     qs("btn-send").addEventListener("click", openSendModal);
     qs("send-print").addEventListener("click", buildPrintSheet);
     qs("send-csv").addEventListener("click", buildCsv);
