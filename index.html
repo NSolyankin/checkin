@@ -103,6 +103,36 @@
     border-radius: 14px;
     overflow: hidden;
     background: #000000;
+    position: relative;
+  }
+  #cam-flash {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    z-index: 5;
+  }
+  #cam-flash .fl-icon {
+    font-size: 96px;
+    font-weight: 700;
+    line-height: 1;
+    color: #ffffff;
+  }
+  #cam-flash .fl-title {
+    font-size: 25px;
+    font-weight: 700;
+    color: #ffffff;
+    margin-top: 10px;
+    padding: 0 14px;
+  }
+  #cam-flash .fl-sub {
+    font-size: 17px;
+    color: rgba(255,255,255,0.92);
+    margin-top: 6px;
+    padding: 0 14px;
   }
   .cam-wrap video { width: 100%; display: block; }
   .scan-card {
@@ -399,6 +429,11 @@
     </div>
     <div class="cam-wrap" id="cam-wrap" style="display:none;">
       <video id="cam-video" playsinline muted></video>
+      <div id="cam-flash">
+        <div class="fl-icon" id="fl-icon"></div>
+        <div class="fl-title" id="fl-title"></div>
+        <div class="fl-sub" id="fl-sub"></div>
+      </div>
     </div>
     <div id="scan-result"></div>
     <div class="status wait" id="queue-info" style="display:none;"></div>
@@ -442,6 +477,7 @@
         <li><span class="tag bad">Красная</span> - код не найден или это посторонний QR. Отправьте гостя к организатору.</li>
         <li><span class="tag queued">Синяя</span> - интернет пропал, отметка сохранена на телефоне и уйдет сама, когда связь появится. Гостя пропускайте, ничего делать не нужно.</li>
       </ul>
+      <p>Результат сканирования показывается крупной цветной вспышкой прямо поверх окна камеры: зеленая с галочкой - проходите, оранжевая - уже отмечен, красная - код не найден, синяя - сохранено без связи. На айфоне с включенным беззвучным режимом звукового сигнала не будет - ориентируйтесь на вспышку.</p>
       <p>Наверху экрана индикатор связи. Даже если он красный, продолжайте сканировать: все отметки копятся в очереди и отправятся автоматически.</p>
     </div>
 
@@ -675,7 +711,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   /* ==== Настройки подключения ==== */
   var PROXY_BASE = "https://checkin-proxy.nsolyankin.deno.net";
   var SUPABASE_KEY = "sb_publishable_un-yRBahx6hB0t6NQGjc-A_8GTPV1ZO";
-  var APP_VERSION = "0.9";
+  var APP_VERSION = "0.9.1";
 
   /* ==== Состояние ==== */
   var settings = null;
@@ -1799,6 +1835,34 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     } catch (e) { /* не критично */ }
   }
 
+  var flashTimer = null;
+
+  function showFlash(kind, title, sub) {
+    var el = qs("cam-flash");
+    var colors = {
+      ok: "rgba(29,122,53,0.93)",
+      dup: "rgba(196,138,0,0.93)",
+      bad: "rgba(178,37,37,0.93)",
+      queued: "rgba(42,99,200,0.93)",
+      wait: "rgba(20,20,24,0.82)"
+    };
+    var icons = { ok: "\u2713", dup: "!", bad: "\u2715", queued: "\u2713", wait: "\u2026" };
+    el.style.background = colors[kind] || colors.wait;
+    qs("fl-icon").textContent = icons[kind] || "";
+    qs("fl-title").textContent = title || "";
+    qs("fl-sub").textContent = sub || "";
+    el.style.display = "flex";
+    if (flashTimer) { clearTimeout(flashTimer); flashTimer = null; }
+    if (kind !== "wait") {
+      flashTimer = setTimeout(function () { el.style.display = "none"; }, 1700);
+    }
+  }
+
+  function hideFlash() {
+    if (flashTimer) { clearTimeout(flashTimer); flashTimer = null; }
+    qs("cam-flash").style.display = "none";
+  }
+
   function showScanCard(kind, title, sub) {
     qs("scan-result").innerHTML =
       "<div class='scan-card " + kind + "'>" + esc(title) +
@@ -1907,11 +1971,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
   /* --- отметка по коду --- */
   function processCheckin(token) {
+    showFlash("wait", "Код распознан", "Проверяю...");
     showScanCard("wait", "Проверяю код...", "");
     var path = "/rest/v1/guests?token=eq." + encodeURIComponent(token) +
       "&select=first_last_name,game_name,category,status,arrived_at";
     api(path, { timeoutMs: 8000 }).then(function (rows) {
       if (!rows || !rows.length) {
+        showFlash("bad", "Код не найден", "Отправьте гостя к организатору");
         showScanCard("bad", "Код не найден", "Гостя с таким кодом нет в списке");
         beep("bad");
         return null;
@@ -1920,6 +1986,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       var title = g.first_last_name + (g.category ? " (" + g.category + ")" : "");
       if (g.status === "пришел") {
         var t = g.arrived_at ? fmtTime(g.arrived_at) : "";
+        showFlash("dup", "Уже пришел" + (t ? " в " + t : ""), title);
         showScanCard("dup", "Уже пришел" + (t ? " в " + t : ""), title);
         beep("dup");
         return null;
@@ -1927,9 +1994,11 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       return patchArrival(token, new Date().toISOString(), scannerLabel())
         .then(function (updated) {
           if (updated && updated.length) {
+            showFlash("ok", "Проходите!", title);
             showScanCard("ok", "Приход отмечен", title);
             beep("ok");
           } else {
+            showFlash("dup", "Уже отмечен другим встречающим", title);
             showScanCard("dup", "Уже отмечен другим встречающим", title);
             beep("dup");
           }
@@ -1937,6 +2006,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }).catch(function () {
       enqueueMark(token);
       setConn(false);
+      showFlash("queued", "Сохранено без связи", "Гостя можно пропускать");
       showScanCard("queued", "Отметка сохранена без связи",
         "Отправится автоматически. Гостя можно пропускать.");
       beep("queued");
@@ -1950,6 +2020,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (lastToken === "!" && now - lastTokenAt < 5000) { return; }
       lastToken = "!";
       lastTokenAt = now;
+      showFlash("bad", "Это не код гостя", "Отсканирован посторонний QR");
       showScanCard("bad", "Это не код гостя", "Отсканирован посторонний QR");
       beep("bad");
       return;
@@ -2019,6 +2090,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   }
 
   function stopCam() {
+    hideFlash();
     if (scanTimer) { clearInterval(scanTimer); scanTimer = null; }
     if (camStream) {
       var tracks = camStream.getTracks();
