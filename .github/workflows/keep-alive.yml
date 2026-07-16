@@ -1,16 +1,10 @@
-# Keep-alive для Supabase проекта tournament-checkin
+# Keep-alive для Supabase проекта tournament-checkin (версия с диагностикой)
 # Файл: .github/workflows/keep-alive.yml в репозитории checkin
-#
-# Требуются секреты репозитория (Settings -> Secrets and variables -> Actions):
-#   SUPABASE_URL      = https://jdfupjkrckqqttsymwhr.supabase.co
-#   SUPABASE_ANON_KEY = анонимный ключ (Dashboard -> Settings -> API -> anon public)
 
 name: Supabase keep-alive
 
 on:
   schedule:
-    # Дважды в день (UTC): 03:17 и 15:17. Минута не 0, чтобы не попадать
-    # в пиковую нагрузку GitHub, когда cron чаще пропускается.
     - cron: '17 3 * * *'
     - cron: '17 15 * * *'
   workflow_dispatch: {}
@@ -22,11 +16,19 @@ jobs:
       - name: Upsert keep-alive row
         run: |
           NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-          curl --fail -sS -X POST \
+          HTTP_CODE=$(curl -sS -o /tmp/resp.txt -w "%{http_code}" -X POST \
             "${{ secrets.SUPABASE_URL }}/rest/v1/keep_alive?on_conflict=id" \
             -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
             -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
             -H "Content-Type: application/json" \
             -H "Prefer: resolution=merge-duplicates" \
-            -d "{\"id\": 1, \"pinged_at\": \"${NOW}\"}"
+            -d "{\"id\": 1, \"pinged_at\": \"${NOW}\"}")
+          echo "HTTP status: ${HTTP_CODE}"
+          echo "Response body:"
+          cat /tmp/resp.txt
+          echo ""
+          if [ "${HTTP_CODE}" -ge 400 ]; then
+            echo "::error::Supabase ping failed with HTTP ${HTTP_CODE}"
+            exit 1
+          fi
           echo "OK: ping at ${NOW}"
